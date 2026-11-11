@@ -28,8 +28,8 @@ draw_game :: proc(f: ^Frame, g: ^Game) {
 	// Outside: grass.
 	for cy in 0 ..< SCREEN_H / TILE {
 		for cx in 0 ..< SCREEN_W / TILE {
-			// Not behind the title, the tallies or the hints.
-			if cy >= PLOT_TY - 2 && cy <= PLOT_TY + PLOT_H && grass_here(cx, cy) {
+			// Not behind the title, the tallies, the shop or the hints.
+			if cy >= PLOT_TY - 2 && cy <= PLOT_TY + PLOT_H && cx <= PLOT_TX + PLOT_W && grass_here(cx, cy) {
 				draw_gfx(f, .Grass, cx * TILE, cy * TILE, COLOR_TEAL)
 			}
 		}
@@ -101,6 +101,8 @@ draw_game :: proc(f: ^Frame, g: ^Game) {
 			print(f, itoa(buf[:], p.amount), sx - 6 + w, sy - 8 - rise, COLOR_YELLOW)
 		case .Full:
 			print(f, "FULL!", sx - 9, sy - 8 - rise, COLOR_ORANGE)
+		case .New_Bush:
+			print(f, "NEW!", sx - 6, sy - 8 - rise, COLOR_LIME)
 		}
 	}
 	// Title and tallies.
@@ -120,12 +122,50 @@ draw_game :: proc(f: ^Frame, g: ^Game) {
 		draw_gfx(f, .Berry, x, y - 2, COLOR_RED)
 		x += TILE + 3
 		x += print(f, "Held ", x, y, COLOR_LIGHT)
-		x += print(f, itoa(buf[:], g.carried), x, y, g.carried >= CARRY_MAX ? COLOR_ORANGE : COLOR_RED)
-		print(f, itoa(buf[:], CARRY_MAX), x + print(f, "/", x, y, COLOR_MID), y, COLOR_MID)
+		x += print(f, itoa(buf[:], g.carried), x, y, g.carried >= carry_max(g) ? COLOR_ORANGE : COLOR_RED)
+		print(f, itoa(buf[:], carry_max(g)), x + print(f, "/", x, y, COLOR_MID), y, COLOR_MID)
 	}
+	draw_shop(f, g)
 	// How to play.
 	hy := (PLOT_TY + PLOT_H + 1) * TILE + 6
 	print_centered(f, "Walk into the bush to pick a berry.", hy, COLOR_LIGHT)
 	print_centered(f, "Walk into the basket to drop 'em in: a jool a berry.", hy + 10, COLOR_LIGHT)
-	print_centered(f, "Arrows or WASD, Space to act, or click.", hy + 20, COLOR_MID)
+	print_centered(f, "Arrows or WASD, Space acts, 1 and 2 buy, or click.", hy + 20, COLOR_MID)
+}
+
+// The shop on the right: a row per item, its key, what it does and its price (yellow when
+// affordable, red while flashing "not enough").
+draw_shop :: proc(f: ^Frame, g: ^Game) {
+	print(f, "SHOP", SHOP_X, SHOP_Y, COLOR_CYAN)
+	buf: [16]u8
+	for item in Shop_Item {
+		y := SHOP_ROW_Y + int(item) * SHOP_ROW_H
+		fill_rect(f, SHOP_X - 4, y - 2, SHOP_W + 4, SHOP_ROW_H - 4, COLOR_DARK)
+		key := item == .Hands ? "1 " : "2 "
+		x := SHOP_X + print(f, key, SHOP_X, y, COLOR_MID)
+		switch item {
+		case .Hands:
+			print(f, "Hands +1", x, y, COLOR_WHITE)
+		case .Bush:
+			print(f, "New bush", x, y, COLOR_WHITE)
+		}
+		cost, ok := price(g, item)
+		py := y + 11
+		if !ok {
+			print(f, item == .Bush ? "plot full" : "maxed", x, py, COLOR_MID)
+			continue
+		}
+		color: u8 = g.jools >= cost ? COLOR_YELLOW : COLOR_MID
+		if g.deny == 1 + int(item) {
+			color = COLOR_RED
+		}
+		px := x + print(f, itoa(buf[:], cost), x, py, color)
+		print(f, " J", px, py, color)
+	}
+	// What has been bought so far.
+	y := SHOP_ROW_Y + len(Shop_Item) * SHOP_ROW_H + 4
+	x := SHOP_X + print(f, "Bushes ", SHOP_X, y, COLOR_MID)
+	x += print(f, itoa(buf[:], g.bush_count), x, y, COLOR_LIME)
+	x += print(f, "/", x, y, COLOR_MID)
+	print(f, itoa(buf[:], len(BUSH_SPOTS)), x, y, COLOR_MID)
 }

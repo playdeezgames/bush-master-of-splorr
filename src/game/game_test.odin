@@ -38,7 +38,7 @@ hands_hold_only_carry_max :: proc(t: ^testing.T) {
 		command(&g, .Act)
 		tick(&g, REGROW_SECONDS) // keep the bush stocked
 	}
-	testing.expect_value(t, g.carried, CARRY_MAX)
+	testing.expect_value(t, g.carried, CARRY_START)
 }
 
 @(test)

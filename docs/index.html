@@ -105,22 +105,25 @@
 		store(() => localStorage.removeItem(SAVE_KEY));
 	});
 
-	// game.Command order (src/game/game.odin): North South West East Act.
-	const C = { N: 0, S: 1, W: 2, E: 3, ACT: 4 };
+	// game.Command order (src/game/game.odin): North South West East Act Buy_Hands Buy_Bush.
+	const C = { N: 0, S: 1, W: 2, E: 3, ACT: 4, HANDS: 5, BUSH: 6 };
 	const KEYS = {
 		ArrowUp: C.N, ArrowDown: C.S, ArrowLeft: C.W, ArrowRight: C.E,
 		KeyW: C.N, KeyS: C.S, KeyA: C.W, KeyD: C.E,
 		Numpad8: C.N, Numpad2: C.S, Numpad4: C.W, Numpad6: C.E,
 		Space: C.ACT, Enter: C.ACT, NumpadEnter: C.ACT, Numpad5: C.ACT,
+		Digit1: C.HANDS, Numpad1: C.HANDS, Digit2: C.BUSH, Numpad3: C.BUSH,
 	};
 	window.addEventListener("keydown", (e) => {
 		if (e.code === "KeyF" && !e.repeat) { e.preventDefault(); feedback.open(); return; }
 		if (!(e.code in KEYS)) return;
 		e.preventDefault();
+		if (e.repeat && KEYS[e.code] > C.ACT) return; // a held key buys once
 		ex.platform_command(KEYS[e.code]);
 	});
 
-	// Mouse and touch: a click or tap walks there; on the bush or the basket it walks beside it and acts.
+	// Mouse and touch: a click or tap walks there; on the bush or the basket it walks beside it and acts;
+	// on a shop row it buys.
 	canvas.addEventListener("contextmenu", (e) => e.preventDefault());
 	canvas.addEventListener("pointerdown", (e) => {
 		const r = canvas.getBoundingClientRect();
@@ -151,7 +154,7 @@
 		b.addEventListener("contextmenu", (e) => e.preventDefault());
 	});
 
-	// Gamepad (standard mapping): d-pad or left stick to move, A (or any face button) to act.
+	// Gamepad (standard mapping): d-pad or left stick to move, A or B to act, X buys hands, Y buys a bush.
 	// Held directions repeat after 12 frames, then every 6.
 	const pad = { held: -1, frames: 0, buttons: [] };
 	function stickCommand(gp) {
@@ -169,9 +172,9 @@
 		const d = stickCommand(gp);
 		if (d !== pad.held) { pad.held = d; pad.frames = 0; if (d >= 0) ex.platform_command(d); }
 		else if (d >= 0 && ++pad.frames >= 12) { pad.frames = 6; ex.platform_command(d); }
-		[0, 1, 2, 3].forEach((i) => {
+		[[0, C.ACT], [1, C.ACT], [2, C.HANDS], [3, C.BUSH]].forEach(([i, c]) => {
 			const now = !!(gp.buttons[i] && gp.buttons[i].pressed);
-			if (now && !pad.buttons[i]) ex.platform_command(C.ACT);
+			if (now && !pad.buttons[i]) ex.platform_command(c);
 			pad.buttons[i] = now;
 		});
 	}

@@ -1,14 +1,16 @@
 package game
 
 // The rules: a fenced plot with one berry bush and a basket in the corner. The bush master picks
-// berries (walk into the bush), carries them to the basket (walk into it) and gets a jool for every
+// berries (walk into the bush), carries them to the basket (walk into it) and gets jools for every
 // berry dropped in. Bushes grow their berries back over time. Real time: `tick` gets seconds.
+// The shop (shop.odin) sells bigger hands and more bushes.
 // No core:os, no core:fmt; `itoa` makes numbers into text.
 
 // Tuning.
 BERRY_MAX :: 5 // berries a bush holds when full
 REGROW_SECONDS :: 3.0 // seconds for a bush to grow one berry back
-CARRY_MAX :: 5 // berries the bush master can hold at once
+JOOLS_PER_BERRY :: 1 // fixed; a better price is kept for a later prestige metacurrency, not the shop
+CARRY_START :: 5 // berries the bush master can hold at first (the shop adds more)
 STEP_SECONDS :: 0.12 // seconds per tile when walking to a clicked spot
 POP_SECONDS :: 0.8 // how long a "+1" floats
 
@@ -22,7 +24,7 @@ PLOT_TY :: 5
 BUSH_CAP :: 16
 POP_CAP :: 8
 
-SAVE_VERSION :: 1
+SAVE_VERSION :: 2 // version 1 saves (before the shop) still load: see load_game
 
 Command :: enum {
 	North,
@@ -30,6 +32,8 @@ Command :: enum {
 	West,
 	East,
 	Act, // pick from a bush or empty yer hands into the basket, whichever is next to you
+	Buy_Hands, // the shop's rows, in order
+	Buy_Bush,
 }
 
 Pointer :: enum {
@@ -48,6 +52,7 @@ Pop_Kind :: enum {
 	Berry, // picked one
 	Jools, // dropped berries in the basket
 	Full, // hands full
+	New_Bush, // a bush just planted
 }
 
 Pop :: struct {
@@ -73,6 +78,10 @@ Game :: struct {
 	tx, ty:             int,
 	step_timer:         f64,
 	pops:               [POP_CAP]Pop,
+	// Added with the shop (version 2). New fields go at the end so older saves are a prefix.
+	hands_level:        int, // hand upgrades bought
+	deny:               int, // shop row flashing "not enough jools" (0 none, 1 + Shop_Item)
+	deny_timer:         f64,
 }
 
 init_game :: proc(g: ^Game) {
@@ -130,7 +139,7 @@ add_pop :: proc(g: ^Game, kind: Pop_Kind, amount, x, y: int) {
 
 // Picks one berry off `b`, if there is one and room in yer hands.
 pick :: proc(g: ^Game, b: ^Bush) {
-	if g.carried >= CARRY_MAX {
+	if g.carried >= carry_max(g) {
 		add_pop(g, .Full, 0, g.px, g.py)
 		return
 	}
@@ -151,8 +160,9 @@ deposit :: proc(g: ^Game) {
 	if g.carried <= 0 {
 		return
 	}
-	g.jools += g.carried
-	add_pop(g, .Jools, g.carried, g.basket_x, g.basket_y)
+	pay := g.carried * JOOLS_PER_BERRY
+	g.jools += pay
+	add_pop(g, .Jools, pay, g.basket_x, g.basket_y)
 	g.carried = 0
 }
 
@@ -188,6 +198,10 @@ command :: proc(g: ^Game, c: Command) {
 	case .North, .South, .West, .East:
 		d := DIRS[int(c)]
 		move(g, d.x, d.y)
+	case .Buy_Hands:
+		buy(g, .Hands)
+	case .Buy_Bush:
+		buy(g, .Bush)
 	case .Act:
 		// The basket first when carrying (that is where berries go), otherwise a bush.
 		if g.carried > 0 {
@@ -216,6 +230,10 @@ command :: proc(g: ^Game, c: Command) {
 // A click or tap at framebuffer pixel (x, y): walk there, and act on a bush or the basket.
 pointer :: proc(g: ^Game, x, y: int, kind: Pointer) {
 	_ = kind
+	if item, ok := shop_row_at(x, y); ok {
+		buy(g, item)
+		return
+	}
 	tx := x / TILE - PLOT_TX
 	ty := y / TILE - PLOT_TY
 	if x < 0 || y < 0 || !in_plot(tx, ty) {
@@ -314,6 +332,13 @@ tick :: proc(g: ^Game, seconds: f64) -> bool {
 			changed = true
 		}
 	}
+	if g.deny != 0 {
+		g.deny_timer -= dt
+		if g.deny_timer <= 0 {
+			g.deny = 0
+		}
+		changed = true
+	}
 	if g.walking {
 		g.step_timer += dt
 		for g.walking && g.step_timer >= STEP_SECONDS {
@@ -351,8 +376,10 @@ itoa :: proc(buf: []u8, n: int) -> string {
 	return string(buf[i:])
 }
 
-// Saves are the Game's bytes; a save of another size or version is not read.
+// Saves are the Game's bytes; a save of another size or version is not read. A version 1 save
+// (before the shop) is the same bytes up to `hands_level`, so it loads with no upgrades bought.
 SAVE_CAP :: size_of(Game)
+SAVE_V1_SIZE :: int(offset_of(Game, hands_level))
 
 save_game :: proc(g: ^Game, out: []u8) -> int {
 	if len(out) < size_of(Game) {
@@ -363,14 +390,16 @@ save_game :: proc(g: ^Game, out: []u8) -> int {
 }
 
 load_game :: proc(g: ^Game, data: []u8) -> bool {
-	if len(data) != size_of(Game) {
+	if len(data) != size_of(Game) && len(data) != SAVE_V1_SIZE {
 		return false
 	}
 	tmp: Game
 	copy(([^]u8)(&tmp)[:size_of(Game)], data)
-	if tmp.version != SAVE_VERSION || tmp.bush_count < 1 || tmp.bush_count > BUSH_CAP {
+	want := len(data) == SAVE_V1_SIZE ? 1 : SAVE_VERSION
+	if tmp.version != want || tmp.bush_count < 1 || tmp.bush_count > BUSH_CAP {
 		return false
 	}
+	tmp.version = SAVE_VERSION
 	g^ = tmp
 	return true
 }

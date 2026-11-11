@@ -17,7 +17,11 @@ dump_play :: proc(t: ^testing.T) {
 		g.bushes[0].berries = 3
 		g.px, g.py = 9, 6
 		g.carried = 2
-		g.jools = 17
+		g.jools = 74
+		g.hands_level = 2
+		g.bushes[1] = {x = 6, y = 2, berries = 4}
+		g.bush_count = 2
+		g.deny = 1 + int(Shop_Item.Bush)
 		add_pop(&g, .Jools, 3, g.basket_x, g.basket_y)
 		g.pops[0].age = 0.3
 		f := new(Frame)

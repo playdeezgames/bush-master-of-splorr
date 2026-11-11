@@ -15,11 +15,13 @@ One fenced plot, one berry bush, one basket. Pick berries, drop 'em in, get jool
 
 Yer plot is small and fenced in. On it grows one berry bush, and in the corner sits a basket. Pick the berries, carry them over, drop them in. Every berry in the basket is a jool. The bush grows its berries back, given time.
 
+Spend yer jools at the shop: bigger hands to carry more, and new bushes to pick from. Each one costs more than the last.
+
 ### How to play
 
-- **Keyboard:** arrow keys or WASD to walk. Walk into the bush to pick a berry; walk into the basket to drop in what yer holding. Space or Enter does whichever is next to you. F sends feedback.
-- **Mouse or touch:** click or tap a spot to walk there; click the bush or the basket to walk over and use it. On a phone, the pads beside the screen walk and act.
-- **Gamepad:** d-pad or left stick to walk, A to act.
+- **Keyboard:** arrow keys or WASD to walk. Walk into the bush to pick a berry; walk into the basket to drop in what yer holding. Space or Enter does whichever is next to you. 1 buys bigger hands, 2 buys a new bush. F sends feedback.
+- **Mouse or touch:** click or tap a spot to walk there; click the bush or the basket to walk over and use it; click a shop row to buy. On a phone, the pads beside the screen walk and act.
+- **Gamepad:** d-pad or left stick to walk, A to act, X for bigger hands, Y for a new bush.
 
 Yer plot is saved in the browser as you play. "Start over" under the screen begins a fresh one.
 
