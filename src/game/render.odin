@@ -28,8 +28,8 @@ draw_game :: proc(f: ^Frame, g: ^Game) {
 	// Outside: grass.
 	for cy in 0 ..< SCREEN_H / TILE {
 		for cx in 0 ..< SCREEN_W / TILE {
-			// Not behind the title, the tallies, the shop or the hints.
-			if cy >= PLOT_TY - 2 && cy <= PLOT_TY + PLOT_H && cx <= PLOT_TX + PLOT_W && grass_here(cx, cy) {
+			// Not behind the title, the tallies or the hints.
+			if cy >= PLOT_TY - 2 && cy <= PLOT_TY + PLOT_H && grass_here(cx, cy) {
 				draw_gfx(f, .Grass, cx * TILE, cy * TILE, COLOR_TEAL)
 			}
 		}
@@ -76,6 +76,13 @@ draw_game :: proc(f: ^Frame, g: ^Game) {
 	{
 		sx, sy := tile_px(g.basket_x, g.basket_y)
 		draw_gfx(f, .Basket, sx, sy, COLOR_BROWN)
+	}
+	// The shop: a bold yellow $ in a yellow frame.
+	{
+		sx, sy := tile_px(g.shop_x, g.shop_y)
+		draw_frame(f, sx, sy, TILE, TILE, COLOR_YELLOW)
+		print(f, "$", sx + 3, sy + 2, COLOR_YELLOW)
+		print(f, "$", sx + 4, sy + 2, COLOR_YELLOW)
 	}
 	// The bush master, with what they carry as dots over their head.
 	{
@@ -125,47 +132,89 @@ draw_game :: proc(f: ^Frame, g: ^Game) {
 		x += print(f, itoa(buf[:], g.carried), x, y, g.carried >= carry_max(g) ? COLOR_ORANGE : COLOR_RED)
 		print(f, itoa(buf[:], carry_max(g)), x + print(f, "/", x, y, COLOR_MID), y, COLOR_MID)
 	}
-	draw_shop(f, g)
 	// How to play.
 	hy := (PLOT_TY + PLOT_H + 1) * TILE + 6
-	print_centered(f, "Walk into the bush to pick a berry.", hy, COLOR_LIGHT)
-	print_centered(f, "Walk into the basket to drop 'em in: a jool a berry.", hy + 10, COLOR_LIGHT)
-	print_centered(f, "Arrows or WASD, Space acts, 1 and 2 buy, or click.", hy + 20, COLOR_MID)
+	print_centered(f, "Walk into a bush to pick, the basket to sell,", hy, COLOR_LIGHT)
+	print_centered(f, "and the $ to shop. A jool a berry.", hy + 10, COLOR_LIGHT)
+	print_centered(f, "Arrows or WASD to walk, Space for OK, Esc to cancel.", hy + 20, COLOR_MID)
+	if g.menu_open {
+		draw_shop_menu(f, g)
+	}
 }
 
-// The shop on the right: a row per item, its key, what it does and its price (yellow when
-// affordable, red while flashing "not enough").
-draw_shop :: proc(f: ^Frame, g: ^Game) {
-	print(f, "SHOP", SHOP_X, SHOP_Y, COLOR_CYAN)
+draw_frame :: proc(f: ^Frame, x, y, w, h: int, c: u8) {
+	fill_rect(f, x, y, w, 1, c)
+	fill_rect(f, x, y + h - 1, w, 1, c)
+	fill_rect(f, x, y, 1, h, c)
+	fill_rect(f, x + w - 1, y, 1, h, c)
+}
+
+// The shop menu over the plot: a row per item with its price (yellow when affordable, red while
+// flashing "not enough"), then Leave. The chosen row has a > and a lighter band.
+MENU_W :: 252
+MENU_H :: 78
+MENU_X :: (SCREEN_W - MENU_W) / 2
+MENU_Y :: PLOT_TY * TILE + 6
+
+draw_shop_menu :: proc(f: ^Frame, g: ^Game) {
+	fill_rect(f, MENU_X, MENU_Y, MENU_W, MENU_H, COLOR_BLACK)
+	draw_frame(f, MENU_X, MENU_Y, MENU_W, MENU_H, COLOR_YELLOW)
 	buf: [16]u8
-	for item in Shop_Item {
-		y := SHOP_ROW_Y + int(item) * SHOP_ROW_H
-		fill_rect(f, SHOP_X - 4, y - 2, SHOP_W + 4, SHOP_ROW_H - 4, COLOR_DARK)
-		key := item == .Hands ? "1 " : "2 "
-		x := SHOP_X + print(f, key, SHOP_X, y, COLOR_MID)
+	x0 := MENU_X + 10
+	print(f, "$ THE SHOP", x0, MENU_Y + 6, COLOR_YELLOW)
+	{
+		n := itoa(buf[:], g.jools)
+		w := text_width("Jools ") + text_width(n)
+		x := MENU_X + MENU_W - 10 - w
+		x += print(f, "Jools ", x, MENU_Y + 6, COLOR_LIGHT)
+		print(f, n, x, MENU_Y + 6, COLOR_YELLOW)
+	}
+	for row in 0 ..< SHOP_ROWS {
+		y := MENU_Y + 22 + row * 12
+		chosen := row == g.menu_row
+		if chosen {
+			fill_rect(f, MENU_X + 4, y - 2, MENU_W - 8, 11, COLOR_DARK)
+			print(f, ">", x0, y, COLOR_WHITE)
+		}
+		label_color: u8 = chosen ? COLOR_WHITE : COLOR_LIGHT
+		if row == LEAVE_ROW {
+			print(f, "Leave", x0 + 10, y, label_color)
+			continue
+		}
+		item := Shop_Item(row)
 		switch item {
 		case .Hands:
-			print(f, "Hands +1", x, y, COLOR_WHITE)
+			// "Bigger hands (holds 5)"
+			x := x0 + 10 + print(f, "Bigger hands", x0 + 10, y, label_color)
+			x += print(f, " (holds ", x, y, COLOR_MID)
+			x += print(f, itoa(buf[:], carry_max(g)), x, y, COLOR_MID)
+			print(f, ")", x, y, COLOR_MID)
 		case .Bush:
-			print(f, "New bush", x, y, COLOR_WHITE)
+			// "New bush (have 1 of 8)"
+			x := x0 + 10 + print(f, "New bush", x0 + 10, y, label_color)
+			x += print(f, " (have ", x, y, COLOR_MID)
+			x += print(f, itoa(buf[:], g.bush_count), x, y, COLOR_MID)
+			x += print(f, " of ", x, y, COLOR_MID)
+			x += print(f, itoa(buf[:], len(BUSH_SPOTS)), x, y, COLOR_MID)
+			print(f, ")", x, y, COLOR_MID)
 		}
 		cost, ok := price(g, item)
-		py := y + 11
+		right := MENU_X + MENU_W - 10
 		if !ok {
-			print(f, item == .Bush ? "plot full" : "maxed", x, py, COLOR_MID)
+			t := item == .Bush ? "plot full" : "maxed"
+			print(f, t, right - text_width(t), y, COLOR_MID)
 			continue
 		}
 		color: u8 = g.jools >= cost ? COLOR_YELLOW : COLOR_MID
 		if g.deny == 1 + int(item) {
 			color = COLOR_RED
 		}
-		px := x + print(f, itoa(buf[:], cost), x, py, color)
-		print(f, " J", px, py, color)
+		n := itoa(buf[:], cost)
+		x := right - text_width(n) - text_width(" J")
+		x += print(f, n, x, y, color)
+		print(f, " J", x, y, color)
 	}
-	// What has been bought so far.
-	y := SHOP_ROW_Y + len(Shop_Item) * SHOP_ROW_H + 4
-	x := SHOP_X + print(f, "Bushes ", SHOP_X, y, COLOR_MID)
-	x += print(f, itoa(buf[:], g.bush_count), x, y, COLOR_LIME)
-	x += print(f, "/", x, y, COLOR_MID)
-	print(f, itoa(buf[:], len(BUSH_SPOTS)), x, y, COLOR_MID)
+	hint := g.deny != 0 ? "Not enough jools!" : "Up/Down choose, Space buys, Esc leaves."
+	hc: u8 = g.deny != 0 ? COLOR_RED : COLOR_MID
+	print(f, hint, MENU_X + (MENU_W - text_width(hint)) / 2, MENU_Y + MENU_H - 14, hc)
 }

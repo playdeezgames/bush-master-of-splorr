@@ -36,7 +36,7 @@ step :: proc(dt: f64, c: runtime.Context) -> bool {
 	return true
 }
 
-// A game.Command from a key, a gamepad button or a touch pad.
+// A game.Command from a key, a gamepad button or a touch pad: the four directions, OK and Cancel.
 @(export)
 platform_command :: proc "c" (command: i32) {
 	context = runtime.default_context()
@@ -44,17 +44,6 @@ platform_command :: proc "c" (command: i32) {
 		return
 	}
 	game.command(&state.rules, game.Command(command))
-	state.dirty = true
-}
-
-// A click or tap at framebuffer pixel (x, y); kind is a game.Pointer (0 mouse, 1 right mouse, 2 touch).
-@(export)
-platform_pointer :: proc "c" (x, y, kind: i32) {
-	context = runtime.default_context()
-	if kind < 0 || kind > i32(max(game.Pointer)) {
-		return
-	}
-	game.pointer(&state.rules, int(x), int(y), game.Pointer(kind))
 	state.dirty = true
 }
 

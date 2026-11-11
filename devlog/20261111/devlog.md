@@ -8,4 +8,6 @@ The first build: a small fenced plot with one berry bush and a basket in the cor
 
 ## Later the same day: the shop
 
-Jools now buy things. The shop beside the fence sells bigger hands (carry one more berry) and new bushes (planted bare, they grow their own berries). Each one costs more than the last. Press 1 or 2, click a row, or use X and Y on a gamepad.
+Jools now buy things. In the plot's top-right corner sits a $: walk into it and the shop opens. Up and Down choose, Space buys, Esc leaves. It sells bigger hands (carry one more berry) and new bushes (planted bare, they grow their own berries), each one dearer than the last. The controls are just the arrows or WASD, Space and Esc.
+
+![The shop](../../assets/screenshots/02-shop.png)

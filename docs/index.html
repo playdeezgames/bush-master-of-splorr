@@ -45,7 +45,7 @@
 	<span></span><button data-c="1">&#8595;</button><span></span>
 </div>
 <div id="acts" class="pad">
-	<button data-c="4">Act</button>
+	<button data-c="4">OK</button><button data-c="5">Back</button>
 </div>
 <footer>
 	Bush Master of SPLORR!! by TheGrumpyGameDev. Code made by an AI agent (Claude Code) at the author's direction.
@@ -105,32 +105,25 @@
 		store(() => localStorage.removeItem(SAVE_KEY));
 	});
 
-	// game.Command order (src/game/game.odin): North South West East Act Buy_Hands Buy_Bush.
-	const C = { N: 0, S: 1, W: 2, E: 3, ACT: 4, HANDS: 5, BUSH: 6 };
+	// game.Command order (src/game/game.odin): North South West East Act Cancel. The controls are only
+	// these six (the user's rule): arrows or WASD, Space for OK, Esc to cancel.
+	const C = { N: 0, S: 1, W: 2, E: 3, OK: 4, CANCEL: 5 };
 	const KEYS = {
 		ArrowUp: C.N, ArrowDown: C.S, ArrowLeft: C.W, ArrowRight: C.E,
 		KeyW: C.N, KeyS: C.S, KeyA: C.W, KeyD: C.E,
-		Numpad8: C.N, Numpad2: C.S, Numpad4: C.W, Numpad6: C.E,
-		Space: C.ACT, Enter: C.ACT, NumpadEnter: C.ACT, Numpad5: C.ACT,
-		Digit1: C.HANDS, Numpad1: C.HANDS, Digit2: C.BUSH, Numpad3: C.BUSH,
+		Space: C.OK, Escape: C.CANCEL,
 	};
 	window.addEventListener("keydown", (e) => {
 		if (e.code === "KeyF" && !e.repeat) { e.preventDefault(); feedback.open(); return; }
 		if (!(e.code in KEYS)) return;
 		e.preventDefault();
-		if (e.repeat && KEYS[e.code] > C.ACT) return; // a held key buys once
+		if (e.repeat && KEYS[e.code] === C.CANCEL) return;
 		ex.platform_command(KEYS[e.code]);
 	});
 
-	// Mouse and touch: a click or tap walks there; on the bush or the basket it walks beside it and acts;
-	// on a shop row it buys.
+	// Touch: the pads (directions, OK, Back) appear on the first touch; the screen itself takes no clicks.
 	canvas.addEventListener("contextmenu", (e) => e.preventDefault());
-	canvas.addEventListener("pointerdown", (e) => {
-		const r = canvas.getBoundingClientRect();
-		const x = Math.floor((e.clientX - r.left) * W / r.width), y = Math.floor((e.clientY - r.top) * H / r.height);
-		if (e.pointerType === "touch" || e.pointerType === "pen") { showPads(); ex.platform_pointer(x, y, 2); }
-		else ex.platform_pointer(x, y, e.button === 2 ? 1 : 0);
-	});
+	canvas.addEventListener("pointerdown", (e) => { if (e.pointerType === "touch" || e.pointerType === "pen") showPads(); });
 
 	// Touch pads. Held buttons repeat like held keys.
 	const pads = document.querySelectorAll(".pad");
@@ -144,6 +137,7 @@
 			e.preventDefault();
 			ex.platform_command(c);
 			clearInterval(padHeld);
+			if (c === C.CANCEL) return;
 			const started = Date.now();
 			padHeld = setInterval(() => { if (Date.now() - started > 300) ex.platform_command(c); }, 110);
 		});
@@ -154,7 +148,7 @@
 		b.addEventListener("contextmenu", (e) => e.preventDefault());
 	});
 
-	// Gamepad (standard mapping): d-pad or left stick to move, A or B to act, X buys hands, Y buys a bush.
+	// Gamepad (standard mapping): d-pad or left stick for the directions, A for OK, B to cancel.
 	// Held directions repeat after 12 frames, then every 6.
 	const pad = { held: -1, frames: 0, buttons: [] };
 	function stickCommand(gp) {
@@ -172,7 +166,7 @@
 		const d = stickCommand(gp);
 		if (d !== pad.held) { pad.held = d; pad.frames = 0; if (d >= 0) ex.platform_command(d); }
 		else if (d >= 0 && ++pad.frames >= 12) { pad.frames = 6; ex.platform_command(d); }
-		[[0, C.ACT], [1, C.ACT], [2, C.HANDS], [3, C.BUSH]].forEach(([i, c]) => {
+		[[0, C.OK], [1, C.CANCEL]].forEach(([i, c]) => {
 			const now = !!(gp.buttons[i] && gp.buttons[i].pressed);
 			if (now && !pad.buttons[i]) ex.platform_command(c);
 			pad.buttons[i] = now;

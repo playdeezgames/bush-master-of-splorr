@@ -70,31 +70,6 @@ bush_regrows_over_time :: proc(t: ^testing.T) {
 }
 
 @(test)
-clicking_the_bush_walks_and_picks :: proc(t: ^testing.T) {
-	g: Game
-	init_game(&g)
-	b := g.bushes[0]
-	pointer(&g, (PLOT_TX + b.x) * TILE + 5, (PLOT_TY + b.y) * TILE + 5, .Mouse)
-	for _ in 0 ..< 200 {
-		tick(&g, 0.05)
-	}
-	testing.expect_value(t, g.carried, 1)
-	testing.expect(t, !g.walking, "stopped walking")
-}
-
-@(test)
-clicking_the_basket_deposits :: proc(t: ^testing.T) {
-	g: Game
-	init_game(&g)
-	g.carried = 2
-	pointer(&g, (PLOT_TX + g.basket_x) * TILE + 5, (PLOT_TY + g.basket_y) * TILE + 5, .Touch)
-	for _ in 0 ..< 200 {
-		tick(&g, 0.05)
-	}
-	testing.expect_value(t, g.jools, 2)
-}
-
-@(test)
 save_round_trip :: proc(t: ^testing.T) {
 	g, h: Game
 	init_game(&g)

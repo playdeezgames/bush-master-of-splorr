@@ -1,7 +1,8 @@
 package game
 
-// The shop: bigger hands (carry one more berry) and a new bush. Both get dearer with every one
-// bought. Buy with 1 and 2, by clicking a row, or with the gamepad's X and Y.
+// The shop: a $ in the plot's top-right corner. Walking into it opens a menu: Up and Down choose a
+// row, OK (Space) buys it or leaves, Cancel (Esc) leaves. It sells bigger hands (carry one more
+// berry) and a new bush; both get dearer with every one bought.
 
 // Tuning. Prices are Claude's placeholders, for the user to change.
 HANDS_PRICE_START :: 10 // jools for the first hand upgrade
@@ -19,6 +20,10 @@ Shop_Item :: enum {
 	Hands,
 	Bush,
 }
+
+// The menu's rows: the items, then Leave.
+SHOP_ROWS :: len(Shop_Item) + 1
+LEAVE_ROW :: len(Shop_Item)
 
 carry_max :: proc(g: ^Game) -> int {
 	return CARRY_START + g.hands_level
@@ -52,7 +57,7 @@ price :: proc(g: ^Game, item: Shop_Item) -> (int, bool) {
 // The next free bush spot, skipping one the bush master stands on.
 free_bush_spot :: proc(g: ^Game) -> (int, int, bool) {
 	for s in BUSH_SPOTS {
-		if bush_at(g, s.x, s.y) == nil && !(g.px == s.x && g.py == s.y) && !is_basket(g, s.x, s.y) {
+		if bush_at(g, s.x, s.y) == nil && !(g.px == s.x && g.py == s.y) && !is_basket(g, s.x, s.y) && !is_shop(g, s.x, s.y) {
 			return s.x, s.y, true
 		}
 	}
@@ -87,20 +92,26 @@ buy :: proc(g: ^Game, item: Shop_Item) -> bool {
 	return true
 }
 
-// The shop panel, right of the fence. Rows are clickable.
-SHOP_X :: (PLOT_TX + PLOT_W + 1) * TILE + 8
-SHOP_Y :: PLOT_TY * TILE
-SHOP_ROW_Y :: SHOP_Y + 14 // first row
-SHOP_ROW_H :: 30
-SHOP_W :: SCREEN_W - SHOP_X - 2
+open_shop :: proc(g: ^Game) {
+	g.menu_open = true
+	g.menu_row = 0
+	g.deny = 0
+}
 
-shop_row_at :: proc(x, y: int) -> (Shop_Item, bool) {
-	if x < SHOP_X - 4 || x >= SCREEN_W || y < SHOP_ROW_Y - 2 {
-		return .Hands, false
+shop_command :: proc(g: ^Game, c: Command) {
+	switch c {
+	case .North:
+		g.menu_row = (g.menu_row + SHOP_ROWS - 1) % SHOP_ROWS
+	case .South:
+		g.menu_row = (g.menu_row + 1) % SHOP_ROWS
+	case .West, .East:
+	case .Act:
+		if g.menu_row == LEAVE_ROW {
+			g.menu_open = false
+		} else {
+			buy(g, Shop_Item(g.menu_row))
+		}
+	case .Cancel:
+		g.menu_open = false
 	}
-	row := (y - SHOP_ROW_Y + 2) / SHOP_ROW_H
-	if row < 0 || row > int(max(Shop_Item)) {
-		return .Hands, false
-	}
-	return Shop_Item(row), true
 }
