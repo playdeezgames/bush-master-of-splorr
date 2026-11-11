@@ -9,7 +9,7 @@ One fenced plot, one berry bush, one basket. Pick berries, drop 'em in, get jool
 
 ## Page text
 
-**Latest version:** https://playdeezgames.github.io/bush-master-of-splorr/ (once GitHub Pages is on; also add it as an external link on the page)
+**Latest version:** https://playdeezgames.github.io/bush-master-of-splorr/ (Pages switched on November 11, 2026; also add it as an external link on the page)
 
 **Bush Master of SPLORR!!** is a Metaphor about berries.
 

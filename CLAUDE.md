@@ -36,7 +36,7 @@ Odin compiled to `js_wasm32`, a 384 by 216 software framebuffer of Sweetie-16 pa
 ## Standing rules (full text in the vault's `Home.md`)
 
 - **"Push" means `git push`; "ship" means itch.io.** Do neither unless the user says that word. One ship a day through Coxswain (`ship_today` before, `ship_complete` after); scheduling is not permission.
-- **GitHub Pages first.** The repo is public (`playdeezgames/bush-master-of-splorr`). Pages is not on yet; enabling it is the user's call. To update it once on: `tools/pages.sh`, commit `docs/`, push (each push needs the user's go-ahead).
+- **GitHub Pages first.** The repo is public (`playdeezgames/bush-master-of-splorr`). Pages was switched on November 11, 2026 (the user's request), served from `main` `/docs` at https://playdeezgames.github.io/bush-master-of-splorr/; it shows the game once `docs/` is pushed. To update it: `tools/pages.sh`, commit `docs/`, push (each push needs the user's go-ahead).
 - **Release standard** from the start (`Tech/Release standard.md`).
 - **Public repo: no 1-Bit Kingdom art**, ever. Keep every licence record and credit.
 - If the ROM font 8x8 turns up, ask the user before replacing it (DINOBYTE first, then Public Pixel).
