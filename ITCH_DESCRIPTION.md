@@ -5,7 +5,7 @@ Page: https://thegrumpygamedev.itch.io/bush-master-of-splorr (not created yet; n
 
 ## Short description (the one-line field)
 
-One fenced plot, one berry bush, one basket. Pick berries, drop 'em in, get jools.
+One fenced plot, one berry bush, one basket, and a million-jool mortgage. Pick berries, pay it off.
 
 ## Page text
 
@@ -15,11 +15,13 @@ One fenced plot, one berry bush, one basket. Pick berries, drop 'em in, get jool
 
 Yer plot is small and fenced in. On it grows one berry bush, and in the corner sits a basket. Pick the berries, carry them over, drop them in. Every berry in the basket is a jool. The bush grows its berries back, given time.
 
-Spend yer jools at the shop, the $ in the corner: bigger hands to carry more, and new bushes to pick from. Each one costs more than the last.
+Spend yer jools at the shop, the $ in the corner: bigger hands to carry more, more energy for longer days, and new bushes to pick from. Each one costs more than the last. And pay down the mortgage: a cool million jools at 10% a year, charged every night.
+
+Picking and selling wear you out, and so does standing about: the day only lasts as long as yer energy. When yer energy runs dry, go to bed in the other corner; morning brings full energy, full bushes and a little more interest. Pay the mortgage off and the plot is yers.
 
 ### How to play
 
-- **Keyboard:** arrow keys or WASD to walk, Space for OK, Esc to cancel. Walk into a bush to pick a berry, into the basket to drop in what yer holding, into the $ to shop. In the shop, Up and Down choose and Space buys. (F sends feedback.)
+- **Keyboard:** arrow keys or WASD to walk, Space for OK, Esc to cancel. Walk into a bush to pick a berry, into the basket to drop in what yer holding, into the $ to shop, into the bed to sleep. In the shop, Up and Down choose and Space buys; on the mortgage row, Left and Right choose how much to pay. (F sends feedback.)
 - **Gamepad:** d-pad or left stick to walk, A for OK, B to cancel.
 - **Touch:** the pads beside the screen walk, OK and Back.
 

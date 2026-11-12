@@ -47,6 +47,7 @@ bushes_fill_the_spots_then_stop :: proc(t: ^testing.T) {
 	// With every bush planted, the basket and the shop can still be reached from the start.
 	testing.expect(t, reachable_beside(&g, g.basket_x, g.basket_y), "basket reachable")
 	testing.expect(t, reachable_beside(&g, g.shop_x, g.shop_y), "shop reachable")
+	testing.expect(t, reachable_beside(&g, g.bed_x, g.bed_y), "bed reachable")
 }
 
 @(test)
@@ -72,6 +73,9 @@ version_1_save_loads :: proc(t: ^testing.T) {
 	testing.expect(t, load_game(&h, buf[:SAVE_V1_SIZE]), "old save loads")
 	testing.expect_value(t, h.jools, 9)
 	testing.expect(t, is_shop(&h, PLOT_W - 1, 0), "the shop is placed")
+	testing.expect_value(t, h.energy, ENERGY_START)
+	testing.expect_value(t, h.mortgage, MORTGAGE_START)
+	testing.expect(t, is_bed(&h, 0, PLOT_H - 1), "the bed is placed")
 	testing.expect_value(t, h.version, SAVE_VERSION)
 	testing.expect_value(t, h.hands_level, 0)
 }
@@ -129,11 +133,13 @@ menu_buys_with_ok_and_leaves :: proc(t: ^testing.T) {
 	testing.expect_value(t, g.hands_level, 1)
 	testing.expect(t, g.menu_open, "stays open after buying")
 	command(&g, .South)
-	command(&g, .Act) // row 1: a bush for 50, but only 50 left
+	command(&g, .South)
+	command(&g, .Act) // row 2: a bush for 50, but only 50 left
 	testing.expect_value(t, g.bush_count, 2)
 	command(&g, .Act) // the next bush costs 100: refused
 	testing.expect_value(t, g.bush_count, 2)
 	testing.expect_value(t, g.deny, 1 + int(Shop_Item.Bush))
+	command(&g, .North)
 	command(&g, .North)
 	command(&g, .North) // wraps round to Leave
 	testing.expect_value(t, g.menu_row, LEAVE_ROW)

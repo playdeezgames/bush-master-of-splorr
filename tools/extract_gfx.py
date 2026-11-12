@@ -23,6 +23,7 @@ PICKS = [
     ('Berry',  18, 17),   # red berries (redcurrants), for the side panel
     ('Jools',   0, 46),   # a scatter of coins
     ('Specks',  5, 13),   # scattered brown specks, the plot's dirt
+    ('Bed',     0, 36),   # a brown single bed
 ]
 
 def tile(col, row):

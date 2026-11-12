@@ -1,0 +1,119 @@
+package game
+
+// Energy, the bed and the mortgage (the user's design, November 11, 2026).
+// - Picking a berry and dropping a load in the basket each cost energy, and standing still drains it
+//   slowly, so it is the day's clock. With too little left the bush master cannot pick or sell and
+//   has to go to bed. The shop sells more energy.
+// - The bed is in the plot's bottom-left corner: walk into it to sleep. Sleeping ends the day:
+//   energy is full again, the bushes are full by morning, and the night's interest is added.
+// - The mortgage starts at 1,000,000 jools at 10% a year, charged each night as a 365th of that
+//   (rounded up) and compounding. It is paid from the shop menu's "Pay mortgage" row, Left and
+//   Right choosing the amount. Paying it to zero is the win: a "Paid off!" notice, then play goes on.
+
+// Tuning (the energy numbers are Claude's placeholders).
+ENERGY_START :: 100 // a day's energy before any upgrade
+IDLE_DRAIN_SECONDS :: 2.0 // standing still this long costs 1 energy (paused while a menu or notice is up)
+PICK_ENERGY :: 1 // per berry picked
+DEPOSIT_ENERGY :: 1 // per trip to the basket, however many berries
+MORTGAGE_START :: i64(1_000_000)
+INTEREST_PERCENT_PER_YEAR :: 10
+NIGHTS_PER_YEAR :: 365
+
+// What "Pay mortgage" can pay, chosen with Left and Right; 0 is "all yer jools".
+PAY_STEPS := [?]i64{10, 100, 1_000, 10_000, 100_000, 0}
+
+Notice :: enum {
+	None,
+	Morning, // after a night's sleep: the day, the interest charged
+	Paid_Off, // the mortgage reached zero
+}
+
+energy_max :: proc(g: ^Game) -> int {
+	return ENERGY_START + g.energy_level * ENERGY_UPGRADE
+}
+
+// Standing still: 1 energy every IDLE_DRAIN_SECONDS. A step starts the count again (game.odin).
+// Not while the shop menu or a notice is up. True when energy changed.
+idle_drain :: proc(g: ^Game, dt: f64) -> bool {
+	if g.menu_open || g.notice != .None || g.energy <= 0 {
+		g.idle_timer = 0
+		return false
+	}
+	g.idle_timer += dt
+	changed := false
+	for g.idle_timer >= IDLE_DRAIN_SECONDS && g.energy > 0 {
+		g.idle_timer -= IDLE_DRAIN_SECONDS
+		g.energy -= 1
+		changed = true
+	}
+	return changed
+}
+
+is_bed :: proc(g: ^Game, x, y: int) -> bool {
+	return x == g.bed_x && y == g.bed_y
+}
+
+// True when the bush master has `cost` energy to spend; otherwise a "TIRED" pop.
+spend_energy :: proc(g: ^Game, cost: int) -> bool {
+	if g.energy < cost {
+		add_pop(g, .Tired, 0, g.px, g.py)
+		return false
+	}
+	g.energy -= cost
+	return true
+}
+
+// One night's interest on `owed`: a 365th of 10%, rounded up.
+nightly_interest :: proc(owed: i64) -> i64 {
+	if owed <= 0 {
+		return 0
+	}
+	den := i64(100 * NIGHTS_PER_YEAR)
+	return (owed * INTEREST_PERCENT_PER_YEAR + den - 1) / den
+}
+
+sleep :: proc(g: ^Game) {
+	g.day += 1
+	g.energy = energy_max(g)
+	for i in 0 ..< g.bush_count {
+		g.bushes[i].berries = BERRY_MAX
+		g.bushes[i].regrow = 0
+	}
+	g.last_interest = nightly_interest(g.mortgage)
+	g.mortgage += g.last_interest
+	g.notice = .Morning
+}
+
+// What the chosen pay step pays: "all" is every jool on hand, a fixed step is that many; neither
+// more than is owed.
+pay_amount :: proc(g: ^Game) -> i64 {
+	step := PAY_STEPS[clamp(g.pay_step, 0, len(PAY_STEPS) - 1)]
+	if step == 0 {
+		step = i64(g.jools)
+	}
+	return min(step, g.mortgage)
+}
+
+// Pays the chosen amount; refused (the row flashes) when the jools are short or there is nothing
+// to pay.
+pay_mortgage :: proc(g: ^Game) -> bool {
+	amount := pay_amount(g)
+	if amount <= 0 || i64(g.jools) < amount {
+		g.deny = 1 + PAY_ROW
+		g.deny_timer = 0.5
+		return false
+	}
+	g.jools -= int(amount)
+	g.mortgage -= amount
+	if g.mortgage == 0 {
+		g.menu_open = false
+		g.notice = .Paid_Off
+	}
+	return true
+}
+
+notice_command :: proc(g: ^Game, c: Command) {
+	if c == .Act || c == .Cancel {
+		g.notice = .None
+	}
+}

@@ -8,6 +8,7 @@ _ :: os
 
 DUMP_PLAY :: #config(DUMP_PLAY, "")
 DUMP_SHOP :: #config(DUMP_SHOP, "")
+DUMP_MORNING :: #config(DUMP_MORNING, "")
 
 // Writes a frame mid-play to a PPM, for screenshots: -define:DUMP_PLAY=<path.ppm>
 @(test)
@@ -22,6 +23,9 @@ dump_play :: proc(t: ^testing.T) {
 		g.hands_level = 2
 		g.bushes[1] = {x = 6, y = 2, berries = 4}
 		g.bush_count = 2
+		g.energy = 62
+		g.day = 3
+		g.mortgage = 1_000_548
 		add_pop(&g, .Jools, 3, g.basket_x, g.basket_y)
 		g.pops[0].age = 0.3
 		f := new(Frame)
@@ -63,11 +67,30 @@ dump_shop :: proc(t: ^testing.T) {
 		g.px, g.py = g.shop_x - 1, g.shop_y
 		command(&g, .East)
 		command(&g, .South)
+		command(&g, .South)
 		command(&g, .Act)
 		f := new(Frame)
 		defer free(f)
 		draw_game(f, &g)
 		resolve(f)
 		testing.expect(t, write_ppm(DUMP_SHOP, f))
+	}
+}
+
+// The morning notice after a night's sleep: -define:DUMP_MORNING=<path.ppm>
+@(test)
+dump_morning :: proc(t: ^testing.T) {
+	when DUMP_MORNING != "" {
+		g: Game
+		init_game(&g)
+		g.jools = 31
+		g.energy = 0
+		g.px, g.py = g.bed_x + 1, g.bed_y
+		command(&g, .West)
+		f := new(Frame)
+		defer free(f)
+		draw_game(f, &g)
+		resolve(f)
+		testing.expect(t, write_ppm(DUMP_MORNING, f))
 	}
 }

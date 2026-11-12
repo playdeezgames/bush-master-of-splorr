@@ -2,13 +2,19 @@ package game
 
 // The shop: a $ in the plot's top-right corner. Walking into it opens a menu: Up and Down choose a
 // row, OK (Space) buys it or leaves, Cancel (Esc) leaves. It sells bigger hands (carry one more
-// berry) and a new bush; both get dearer with every one bought.
+// berry), more energy (every day) and a new bush, each dearer with every one bought, and takes mortgage payments (Left and
+// Right choose how much; home.odin).
 
 // Tuning. Prices are Claude's placeholders, for the user to change.
 HANDS_PRICE_START :: 10 // jools for the first hand upgrade
 HANDS_PRICE_GROWTH_NUM :: 3 // each one after costs 3/2 of the last (rounded up)
 HANDS_PRICE_GROWTH_DEN :: 2
 HANDS_MAX_LEVEL :: 30
+ENERGY_UPGRADE :: 20 // energy added to every day per upgrade
+ENERGY_PRICE_START :: 30 // jools for the first energy upgrade
+ENERGY_PRICE_GROWTH_NUM :: 6 // each one after costs 6/5 of the last (rounded up)
+ENERGY_PRICE_GROWTH_DEN :: 5
+ENERGY_MAX_LEVEL :: 60
 BUSH_PRICE_START :: 50 // jools for the first extra bush
 BUSH_PRICE_GROWTH :: 2 // each one after costs twice the last
 
@@ -18,12 +24,14 @@ BUSH_SPOTS := [?][2]int{{3, 2}, {6, 2}, {9, 2}, {3, 5}, {6, 5}, {9, 5}, {12, 2},
 
 Shop_Item :: enum {
 	Hands,
+	Energy,
 	Bush,
 }
 
-// The menu's rows: the items, then Leave.
-SHOP_ROWS :: len(Shop_Item) + 1
-LEAVE_ROW :: len(Shop_Item)
+// The menu's rows: the items, Pay mortgage, then Leave.
+PAY_ROW :: len(Shop_Item)
+LEAVE_ROW :: PAY_ROW + 1
+SHOP_ROWS :: LEAVE_ROW + 1
 
 carry_max :: proc(g: ^Game) -> int {
 	return CARRY_START + g.hands_level
@@ -39,6 +47,15 @@ price :: proc(g: ^Game, item: Shop_Item) -> (int, bool) {
 		p := HANDS_PRICE_START
 		for _ in 0 ..< g.hands_level {
 			p = (p * HANDS_PRICE_GROWTH_NUM + HANDS_PRICE_GROWTH_DEN - 1) / HANDS_PRICE_GROWTH_DEN
+		}
+		return p, true
+	case .Energy:
+		if g.energy_level >= ENERGY_MAX_LEVEL {
+			return 0, false
+		}
+		p := ENERGY_PRICE_START
+		for _ in 0 ..< g.energy_level {
+			p = (p * ENERGY_PRICE_GROWTH_NUM + ENERGY_PRICE_GROWTH_DEN - 1) / ENERGY_PRICE_GROWTH_DEN
 		}
 		return p, true
 	case .Bush:
@@ -57,7 +74,7 @@ price :: proc(g: ^Game, item: Shop_Item) -> (int, bool) {
 // The next free bush spot, skipping one the bush master stands on.
 free_bush_spot :: proc(g: ^Game) -> (int, int, bool) {
 	for s in BUSH_SPOTS {
-		if bush_at(g, s.x, s.y) == nil && !(g.px == s.x && g.py == s.y) && !is_basket(g, s.x, s.y) && !is_shop(g, s.x, s.y) {
+		if bush_at(g, s.x, s.y) == nil && !(g.px == s.x && g.py == s.y) && !is_basket(g, s.x, s.y) && !is_shop(g, s.x, s.y) && !is_bed(g, s.x, s.y) {
 			return s.x, s.y, true
 		}
 	}
@@ -78,6 +95,9 @@ buy :: proc(g: ^Game, item: Shop_Item) -> bool {
 	switch item {
 	case .Hands:
 		g.hands_level += 1
+	case .Energy:
+		g.energy_level += 1
+		g.energy += ENERGY_UPGRADE // today gets the extra too
 	case .Bush:
 		x, y, free := free_bush_spot(g)
 		if !free || g.bush_count >= BUSH_CAP {
@@ -104,11 +124,21 @@ shop_command :: proc(g: ^Game, c: Command) {
 		g.menu_row = (g.menu_row + SHOP_ROWS - 1) % SHOP_ROWS
 	case .South:
 		g.menu_row = (g.menu_row + 1) % SHOP_ROWS
-	case .West, .East:
+	case .West:
+		if g.menu_row == PAY_ROW {
+			g.pay_step = (g.pay_step + len(PAY_STEPS) - 1) % len(PAY_STEPS)
+		}
+	case .East:
+		if g.menu_row == PAY_ROW {
+			g.pay_step = (g.pay_step + 1) % len(PAY_STEPS)
+		}
 	case .Act:
-		if g.menu_row == LEAVE_ROW {
+		switch g.menu_row {
+		case LEAVE_ROW:
 			g.menu_open = false
-		} else {
+		case PAY_ROW:
+			pay_mortgage(g)
+		case:
 			buy(g, Shop_Item(g.menu_row))
 		}
 	case .Cancel:

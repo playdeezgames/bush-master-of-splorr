@@ -4,7 +4,8 @@ package game
 // berries (walk into the bush), carries them to the basket (walk into it) and gets jools for every
 // berry dropped in. Bushes grow their berries back over time. Real time: `tick` gets seconds.
 // The shop (shop.odin) is a $ in the top-right corner: walk into it for a menu of bigger hands and
-// more bushes. Controls are only the four directions, OK (Space) and Cancel (Esc).
+// more bushes and paying the mortgage. Energy, the bed and the mortgage are in home.odin.
+// Controls are only the four directions, OK (Space) and Cancel (Esc).
 // No core:os, no core:fmt; `itoa` makes numbers into text.
 
 // Tuning.
@@ -24,7 +25,7 @@ PLOT_TY :: 5
 BUSH_CAP :: 16
 POP_CAP :: 8
 
-SAVE_VERSION :: 3 // older saves still load: see load_game
+SAVE_VERSION :: 5 // older saves still load: see load_game
 
 Command :: enum {
 	North,
@@ -45,6 +46,7 @@ Pop_Kind :: enum {
 	Berry, // picked one
 	Jools, // dropped berries in the basket
 	Full, // hands full
+	Tired, // not enough energy
 	New_Bush, // a bush just planted
 }
 
@@ -78,6 +80,17 @@ Game :: struct {
 	shop_x, shop_y:     int, // the $ tile
 	menu_open:          bool,
 	menu_row:           int,
+	// Added with energy, the bed and the mortgage (version 4).
+	bed_x, bed_y:       int,
+	energy:             int,
+	day:                int,
+	mortgage:           i64, // jools owed
+	last_interest:      i64, // charged last night, for the morning notice
+	pay_step:           int, // index into PAY_STEPS
+	notice:             Notice,
+	// Added with the energy upgrade and the idle drain (version 5).
+	energy_level:       int, // energy upgrades bought
+	idle_timer:         f64, // seconds stood still toward the next point of drain
 }
 
 init_game :: proc(g: ^Game) {
@@ -85,9 +98,19 @@ init_game :: proc(g: ^Game) {
 	g.version = SAVE_VERSION
 	g.basket_x, g.basket_y = PLOT_W - 1, PLOT_H - 1
 	g.shop_x, g.shop_y = PLOT_W - 1, 0
+	start_home(g)
 	g.bushes[0] = {x = 3, y = 2, berries = BERRY_MAX}
 	g.bush_count = 1
 	g.px, g.py = PLOT_W / 2, PLOT_H / 2
+}
+
+// The version 4 fields' starting values (also given to older saves).
+start_home :: proc(g: ^Game) {
+	g.bed_x, g.bed_y = 0, PLOT_H - 1
+	g.energy = ENERGY_START
+	g.day = 1
+	g.mortgage = MORTGAGE_START
+	g.pay_step = len(PAY_STEPS) - 1 // "all"
 }
 
 in_plot :: proc(x, y: int) -> bool {
@@ -113,7 +136,7 @@ is_shop :: proc(g: ^Game, x, y: int) -> bool {
 }
 
 blocked :: proc(g: ^Game, x, y: int) -> bool {
-	return !in_plot(x, y) || bush_at(g, x, y) != nil || is_basket(g, x, y) || is_shop(g, x, y)
+	return !in_plot(x, y) || bush_at(g, x, y) != nil || is_basket(g, x, y) || is_shop(g, x, y) || is_bed(g, x, y)
 }
 
 add_pop :: proc(g: ^Game, kind: Pop_Kind, amount, x, y: int) {
@@ -147,6 +170,9 @@ pick :: proc(g: ^Game, b: ^Bush) {
 	if b.berries <= 0 {
 		return
 	}
+	if !spend_energy(g, PICK_ENERGY) {
+		return
+	}
 	if b.berries == BERRY_MAX {
 		b.regrow = 0 // the clock starts when the first berry goes
 	}
@@ -159,6 +185,9 @@ pick :: proc(g: ^Game, b: ^Bush) {
 // Drops everything carried into the basket: a jool a berry.
 deposit :: proc(g: ^Game) {
 	if g.carried <= 0 {
+		return
+	}
+	if !spend_energy(g, DEPOSIT_ENERGY) {
 		return
 	}
 	pay := g.carried * JOOLS_PER_BERRY
@@ -182,6 +211,10 @@ act_on :: proc(g: ^Game, x, y: int) -> bool {
 		open_shop(g)
 		return true
 	}
+	if is_bed(g, x, y) {
+		sleep(g)
+		return true
+	}
 	return false
 }
 
@@ -193,12 +226,17 @@ move :: proc(g: ^Game, dx, dy: int) {
 	}
 	if !blocked(g, nx, ny) {
 		g.px, g.py = nx, ny
+		g.idle_timer = 0
 	}
 }
 
 DIRS := [4][2]int{{0, -1}, {0, 1}, {-1, 0}, {1, 0}}
 
 command :: proc(g: ^Game, c: Command) {
+	if g.notice != .None {
+		notice_command(g, c)
+		return
+	}
 	if g.menu_open {
 		shop_command(g, c)
 		return
@@ -259,6 +297,9 @@ tick :: proc(g: ^Game, seconds: f64) -> bool {
 			changed = true
 		}
 	}
+	if idle_drain(g, dt) {
+		changed = true
+	}
 	if g.deny != 0 {
 		g.deny_timer -= dt
 		if g.deny_timer <= 0 {
@@ -271,6 +312,10 @@ tick :: proc(g: ^Game, seconds: f64) -> bool {
 
 // Writes n in decimal into buf and returns it as a string.
 itoa :: proc(buf: []u8, n: int) -> string {
+	return itoa64(buf, i64(n))
+}
+
+itoa64 :: proc(buf: []u8, n: i64) -> string {
 	if len(buf) == 0 {
 		return ""
 	}
@@ -297,10 +342,13 @@ itoa :: proc(buf: []u8, n: int) -> string {
 
 // Saves are the Game's bytes; a save of another size or version is not read. Fields are only ever
 // added at the end of Game, so an older save is a prefix: version 1 (before the shop) ends at
-// `hands_level`, version 2 (the shop panel) at `shop_x`. They load with the new fields defaulted.
+// `hands_level`, version 2 (the shop panel) at `shop_x`, version 3 (the shop menu) at `bed_x`, version 4 (the mortgage)
+// at `energy_level`. They load with the new fields defaulted.
 SAVE_CAP :: size_of(Game)
 SAVE_V1_SIZE :: int(offset_of(Game, hands_level))
 SAVE_V2_SIZE :: int(offset_of(Game, shop_x))
+SAVE_V3_SIZE :: int(offset_of(Game, bed_x))
+SAVE_V4_SIZE :: int(offset_of(Game, energy_level))
 
 save_game :: proc(g: ^Game, out: []u8) -> int {
 	if len(out) < size_of(Game) {
@@ -315,6 +363,10 @@ load_game :: proc(g: ^Game, data: []u8) -> bool {
 	switch len(data) {
 	case size_of(Game):
 		want = SAVE_VERSION
+	case SAVE_V4_SIZE:
+		want = 4
+	case SAVE_V3_SIZE:
+		want = 3
 	case SAVE_V2_SIZE:
 		want = 2
 	case SAVE_V1_SIZE:
@@ -330,10 +382,16 @@ load_game :: proc(g: ^Game, data: []u8) -> bool {
 	if want < 3 {
 		tmp.shop_x, tmp.shop_y = PLOT_W - 1, 0
 	}
+	if want < 4 {
+		start_home(&tmp)
+	}
 	tmp.version = SAVE_VERSION
 	tmp.unused_walk = {}
 	tmp.menu_open = false
 	tmp.deny = 0
+	if tmp.notice > max(Notice) || tmp.notice < min(Notice) {
+		tmp.notice = .None
+	}
 	g^ = tmp
 	return true
 }
