@@ -3,15 +3,15 @@ package game
 // The rules: a fenced plot with one berry bush and a basket in the corner. The bush master picks
 // berries (walk into the bush), carries them to the basket (walk into it) and gets jools for every
 // berry dropped in. Bushes grow their berries back over time. Real time: `tick` gets seconds.
-// The shop (shop.odin) is a $ in the top-right corner: walk into it for a menu of bigger hands and
-// more bushes and paying the mortgage. Energy, the bed and the mortgage are in home.odin.
+// The shop (shop.odin) is a $ in the top-right corner: walk into it for a menu of bigger hands, more
+// energy, stamina, a better price, more bushes and paying the mortgage. Energy, the bed and the mortgage are in home.odin.
 // Controls are only the four directions, OK (Space) and Cancel (Esc).
 // No core:os, no core:fmt; `itoa` makes numbers into text.
 
 // Tuning.
 BERRY_MAX :: 5 // berries a bush holds when full
 REGROW_SECONDS :: 3.0 // seconds for a bush to grow one berry back
-JOOLS_PER_BERRY :: 1 // fixed; a better price is kept for a later prestige metacurrency, not the shop
+JOOLS_PER_BERRY :: 1 // before any "Better price" upgrade (shop.odin)
 CARRY_START :: 5 // berries the bush master can hold at first (the shop adds more)
 POP_SECONDS :: 0.8 // how long a "+1" floats
 
@@ -25,7 +25,7 @@ PLOT_TY :: 5
 BUSH_CAP :: 16
 POP_CAP :: 8
 
-SAVE_VERSION :: 5 // older saves still load: see load_game
+SAVE_VERSION :: 6 // older saves still load: see load_game
 
 Command :: enum {
 	North,
@@ -91,6 +91,9 @@ Game :: struct {
 	// Added with the energy upgrade and the idle drain (version 5).
 	energy_level:       int, // energy upgrades bought
 	idle_timer:         f64, // seconds stood still toward the next point of drain
+	// Added with the better price per berry and stamina (version 6).
+	price_level:        int, // price upgrades bought: each is +1 jool a berry
+	stamina_level:      int, // stamina upgrades bought: each slows the idle drain
 }
 
 init_game :: proc(g: ^Game) {
@@ -182,7 +185,7 @@ pick :: proc(g: ^Game, b: ^Bush) {
 	add_pop(g, .Berry, 1, b.x, b.y)
 }
 
-// Drops everything carried into the basket: a jool a berry.
+// Drops everything carried into the basket: the berry price each (shop.odin).
 deposit :: proc(g: ^Game) {
 	if g.carried <= 0 {
 		return
@@ -190,7 +193,7 @@ deposit :: proc(g: ^Game) {
 	if !spend_energy(g, DEPOSIT_ENERGY) {
 		return
 	}
-	pay := g.carried * JOOLS_PER_BERRY
+	pay := g.carried * berry_price(g)
 	g.jools += pay
 	add_pop(g, .Jools, pay, g.basket_x, g.basket_y)
 	g.carried = 0
@@ -343,12 +346,13 @@ itoa64 :: proc(buf: []u8, n: i64) -> string {
 // Saves are the Game's bytes; a save of another size or version is not read. Fields are only ever
 // added at the end of Game, so an older save is a prefix: version 1 (before the shop) ends at
 // `hands_level`, version 2 (the shop panel) at `shop_x`, version 3 (the shop menu) at `bed_x`, version 4 (the mortgage)
-// at `energy_level`. They load with the new fields defaulted.
+// at `energy_level`, version 5 (the energy upgrade) at `price_level`. They load with the new fields defaulted.
 SAVE_CAP :: size_of(Game)
 SAVE_V1_SIZE :: int(offset_of(Game, hands_level))
 SAVE_V2_SIZE :: int(offset_of(Game, shop_x))
 SAVE_V3_SIZE :: int(offset_of(Game, bed_x))
 SAVE_V4_SIZE :: int(offset_of(Game, energy_level))
+SAVE_V5_SIZE :: int(offset_of(Game, price_level))
 
 save_game :: proc(g: ^Game, out: []u8) -> int {
 	if len(out) < size_of(Game) {
@@ -363,6 +367,8 @@ load_game :: proc(g: ^Game, data: []u8) -> bool {
 	switch len(data) {
 	case size_of(Game):
 		want = SAVE_VERSION
+	case SAVE_V5_SIZE:
+		want = 5
 	case SAVE_V4_SIZE:
 		want = 4
 	case SAVE_V3_SIZE:

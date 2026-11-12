@@ -68,6 +68,8 @@ dump_shop :: proc(t: ^testing.T) {
 		command(&g, .East)
 		command(&g, .South)
 		command(&g, .South)
+		command(&g, .South)
+		command(&g, .South)
 		command(&g, .Act)
 		f := new(Frame)
 		defer free(f)

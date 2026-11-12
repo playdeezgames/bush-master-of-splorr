@@ -2,7 +2,7 @@ package game
 
 // The shop: a $ in the plot's top-right corner. Walking into it opens a menu: Up and Down choose a
 // row, OK (Space) buys it or leaves, Cancel (Esc) leaves. It sells bigger hands (carry one more
-// berry), more energy (every day) and a new bush, each dearer with every one bought, and takes mortgage payments (Left and
+// berry), more energy (every day), stamina (a slower idle drain), a better price per berry and a new bush, each dearer with every one bought, and takes mortgage payments (Left and
 // Right choose how much; home.odin).
 
 // Tuning. Prices are Claude's placeholders, for the user to change.
@@ -15,6 +15,13 @@ ENERGY_PRICE_START :: 30 // jools for the first energy upgrade
 ENERGY_PRICE_GROWTH_NUM :: 6 // each one after costs 6/5 of the last (rounded up)
 ENERGY_PRICE_GROWTH_DEN :: 5
 ENERGY_MAX_LEVEL :: 60
+STAMINA_PRICE_START :: 40 // jools for the first slower idle drain (the user, November 12, 2026)
+STAMINA_PRICE_GROWTH_NUM :: 3 // each one after costs 3/2 of the last (rounded up)
+STAMINA_PRICE_GROWTH_DEN :: 2
+STAMINA_MAX_LEVEL :: 20 // home.odin: each adds IDLE_DRAIN_STEP seconds
+PRICE_PRICE_START :: 250 // jools for the first +1 jool a berry (the dearest upgrade, the user's ask)
+PRICE_PRICE_GROWTH :: 2 // each one after costs twice the last
+PRICE_MAX_LEVEL :: 20
 BUSH_PRICE_START :: 50 // jools for the first extra bush
 BUSH_PRICE_GROWTH :: 2 // each one after costs twice the last
 
@@ -25,6 +32,8 @@ BUSH_SPOTS := [?][2]int{{3, 2}, {6, 2}, {9, 2}, {3, 5}, {6, 5}, {9, 5}, {12, 2},
 Shop_Item :: enum {
 	Hands,
 	Energy,
+	Stamina,
+	Price,
 	Bush,
 }
 
@@ -35,6 +44,11 @@ SHOP_ROWS :: LEAVE_ROW + 1
 
 carry_max :: proc(g: ^Game) -> int {
 	return CARRY_START + g.hands_level
+}
+
+// Jools a berry dropped in the basket earns.
+berry_price :: proc(g: ^Game) -> int {
+	return JOOLS_PER_BERRY + g.price_level
 }
 
 // The price of the next one of `item`, and whether there is a next one.
@@ -56,6 +70,24 @@ price :: proc(g: ^Game, item: Shop_Item) -> (int, bool) {
 		p := ENERGY_PRICE_START
 		for _ in 0 ..< g.energy_level {
 			p = (p * ENERGY_PRICE_GROWTH_NUM + ENERGY_PRICE_GROWTH_DEN - 1) / ENERGY_PRICE_GROWTH_DEN
+		}
+		return p, true
+	case .Stamina:
+		if g.stamina_level >= STAMINA_MAX_LEVEL {
+			return 0, false
+		}
+		p := STAMINA_PRICE_START
+		for _ in 0 ..< g.stamina_level {
+			p = (p * STAMINA_PRICE_GROWTH_NUM + STAMINA_PRICE_GROWTH_DEN - 1) / STAMINA_PRICE_GROWTH_DEN
+		}
+		return p, true
+	case .Price:
+		if g.price_level >= PRICE_MAX_LEVEL {
+			return 0, false
+		}
+		p := PRICE_PRICE_START
+		for _ in 0 ..< g.price_level {
+			p *= PRICE_PRICE_GROWTH
 		}
 		return p, true
 	case .Bush:
@@ -98,6 +130,10 @@ buy :: proc(g: ^Game, item: Shop_Item) -> bool {
 	case .Energy:
 		g.energy_level += 1
 		g.energy += ENERGY_UPGRADE // today gets the extra too
+	case .Stamina:
+		g.stamina_level += 1
+	case .Price:
+		g.price_level += 1
 	case .Bush:
 		x, y, free := free_bush_spot(g)
 		if !free || g.bush_count >= BUSH_CAP {

@@ -12,7 +12,8 @@ package game
 
 // Tuning (the energy numbers are Claude's placeholders).
 ENERGY_START :: 100 // a day's energy before any upgrade
-IDLE_DRAIN_SECONDS :: 2.0 // standing still this long costs 1 energy (paused while a menu or notice is up)
+IDLE_DRAIN_SECONDS :: 10.0 // this long without a step or spending energy costs 1 (paused while a menu or notice is up)
+IDLE_DRAIN_STEP :: 2.0 // seconds each Stamina upgrade adds to that
 PICK_ENERGY :: 1 // per berry picked
 DEPOSIT_ENERGY :: 1 // per trip to the basket, however many berries
 MORTGAGE_START :: i64(1_000_000)
@@ -32,7 +33,13 @@ energy_max :: proc(g: ^Game) -> int {
 	return ENERGY_START + g.energy_level * ENERGY_UPGRADE
 }
 
-// Standing still: 1 energy every IDLE_DRAIN_SECONDS. A step starts the count again (game.odin).
+// Seconds of standing still that cost 1 energy, with the Stamina upgrades.
+idle_seconds :: proc(g: ^Game) -> f64 {
+	return IDLE_DRAIN_SECONDS + f64(g.stamina_level) * IDLE_DRAIN_STEP
+}
+
+// Standing still: 1 energy every idle_seconds. A step (game.odin) or spending energy on a pick
+// or a basket trip starts the count again (the user, November 12, 2026: slower, and spending resets it).
 // Not while the shop menu or a notice is up. True when energy changed.
 idle_drain :: proc(g: ^Game, dt: f64) -> bool {
 	if g.menu_open || g.notice != .None || g.energy <= 0 {
@@ -41,8 +48,9 @@ idle_drain :: proc(g: ^Game, dt: f64) -> bool {
 	}
 	g.idle_timer += dt
 	changed := false
-	for g.idle_timer >= IDLE_DRAIN_SECONDS && g.energy > 0 {
-		g.idle_timer -= IDLE_DRAIN_SECONDS
+	every := idle_seconds(g)
+	for g.idle_timer >= every && g.energy > 0 {
+		g.idle_timer -= every
 		g.energy -= 1
 		changed = true
 	}
@@ -60,6 +68,7 @@ spend_energy :: proc(g: ^Game, cost: int) -> bool {
 		return false
 	}
 	g.energy -= cost
+	g.idle_timer = 0 // working is not idling
 	return true
 }
 

@@ -19,3 +19,5 @@ The plot comes with a mortgage: 1,000,000 jools at 10% a year, charged a little 
 ![Good morning](../../assets/screenshots/03-morning.png)
 
 Energy is also the clock now: standing still wears it down, so the day ends whether you work or not. The shop sells more energy to make the days longer.
+
+November 12: standing still tires you much more slowly now (a point every 10 seconds), and picking or selling starts that count again. The shop also sells stamina, which slows it further, and a better price: each one adds a jool to every berry, and each costs twice the last.

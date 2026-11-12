@@ -151,26 +151,40 @@ energy_upgrade_raises_every_day :: proc(t: ^testing.T) {
 	testing.expect_value(t, g.energy, ENERGY_START + ENERGY_UPGRADE)
 }
 
+// Ticks `seconds` of real time in tenth-of-a-second frames.
+tick_for :: proc(g: ^Game, seconds: f64) {
+	for _ in 0 ..< int(seconds * 10 + 0.5) {
+		tick(g, 0.1)
+	}
+}
+
 @(test)
 standing_still_drains_energy :: proc(t: ^testing.T) {
 	g: Game
 	init_game(&g)
-	// 10 seconds still, in small frames: 5 energy at 2 seconds each.
-	for _ in 0 ..< 100 {
-		tick(&g, 0.1)
-	}
+	tick_for(&g, 5 * IDLE_DRAIN_SECONDS + 0.1) // a frame spare: tenths do not add up exactly
 	testing.expect_value(t, g.energy, ENERGY_START - 5)
-	// A step starts the count again: 1.9 seconds, a step, 1.9 seconds costs nothing.
+	// A step starts the count again: nearly a drain's worth, a step, nearly again costs nothing.
 	g.idle_timer = 0
 	before := g.energy
-	for _ in 0 ..< 19 {
-		tick(&g, 0.1)
-	}
+	tick_for(&g, IDLE_DRAIN_SECONDS - 0.1)
 	command(&g, .North)
-	for _ in 0 ..< 19 {
-		tick(&g, 0.1)
-	}
+	tick_for(&g, IDLE_DRAIN_SECONDS - 0.1)
 	testing.expect_value(t, g.energy, before)
+}
+
+@(test)
+spending_energy_starts_the_idle_count_again :: proc(t: ^testing.T) {
+	g: Game
+	init_game(&g)
+	g.px, g.py = 3, 3 // below the first bush at (3, 2)
+	tick_for(&g, IDLE_DRAIN_SECONDS - 0.1)
+	command(&g, .Act) // pick: 1 energy, and the count restarts
+	testing.expect_value(t, g.energy, ENERGY_START - PICK_ENERGY)
+	tick_for(&g, IDLE_DRAIN_SECONDS - 0.1)
+	testing.expect_value(t, g.energy, ENERGY_START - PICK_ENERGY)
+	tick_for(&g, 0.2)
+	testing.expect_value(t, g.energy, ENERGY_START - PICK_ENERGY - 1)
 }
 
 @(test)
@@ -184,9 +198,7 @@ no_drain_in_menus_or_at_zero :: proc(t: ^testing.T) {
 	testing.expect_value(t, g.energy, ENERGY_START)
 	g.menu_open = false
 	g.energy = 1
-	for _ in 0 ..< 100 {
-		tick(&g, 0.1)
-	}
+	tick_for(&g, 3 * IDLE_DRAIN_SECONDS)
 	testing.expect_value(t, g.energy, 0)
 }
 
@@ -201,4 +213,37 @@ version_4_save_loads :: proc(t: ^testing.T) {
 	testing.expect(t, load_game(&h, buf[:SAVE_V4_SIZE]), "v4 save loads")
 	testing.expect_value(t, h.mortgage, i64(999))
 	testing.expect_value(t, h.energy_level, 0)
+}
+
+@(test)
+version_5_save_loads :: proc(t: ^testing.T) {
+	g, h: Game
+	init_game(&g)
+	g.version = 5
+	g.energy_level = 3
+	buf: [SAVE_CAP]u8
+	save_game(&g, buf[:])
+	testing.expect(t, load_game(&h, buf[:SAVE_V5_SIZE]), "v5 save loads")
+	testing.expect_value(t, h.energy_level, 3)
+	testing.expect_value(t, h.price_level, 0)
+	testing.expect_value(t, berry_price(&h), 1)
+	testing.expect_value(t, h.stamina_level, 0)
+}
+
+@(test)
+stamina_slows_the_idle_drain :: proc(t: ^testing.T) {
+	g: Game
+	init_game(&g)
+	first, _ := price(&g, .Stamina)
+	testing.expect_value(t, first, STAMINA_PRICE_START)
+	g.jools = first
+	testing.expect(t, buy(&g, .Stamina), "bought")
+	testing.expect_value(t, idle_seconds(&g), IDLE_DRAIN_SECONDS + IDLE_DRAIN_STEP)
+	tick_for(&g, IDLE_DRAIN_SECONDS + 0.5)
+	testing.expect_value(t, g.energy, ENERGY_START) // not yet
+	tick_for(&g, IDLE_DRAIN_STEP)
+	testing.expect_value(t, g.energy, ENERGY_START - 1)
+	g.stamina_level = STAMINA_MAX_LEVEL
+	_, more := price(&g, .Stamina)
+	testing.expect(t, !more, "maxed")
 }

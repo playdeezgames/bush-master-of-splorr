@@ -179,7 +179,7 @@ draw_game :: proc(f: ^Frame, g: ^Game) {
 	} else {
 		print_centered(f, "Walk into a bush to pick, the basket to sell,", hy, COLOR_LIGHT)
 	}
-	print_centered(f, "the $ to shop and the bed to sleep. A jool a berry.", hy + 10, COLOR_LIGHT)
+	print_centered(f, "the $ to shop and the bed to sleep.", hy + 10, COLOR_LIGHT)
 	print_centered(f, "Arrows or WASD to walk, Space for OK, Esc to cancel.", hy + 20, COLOR_MID)
 	if g.menu_open {
 		draw_shop_menu(f, g)
@@ -266,9 +266,9 @@ draw_frame :: proc(f: ^Frame, x, y, w, h: int, c: u8) {
 // The shop menu over the plot: a row per item with its price (yellow when affordable, red while
 // flashing "not enough"), then Leave. The chosen row has a > and a lighter band.
 MENU_W :: 252
-MENU_H :: 102
+MENU_H :: 126
 MENU_X :: (SCREEN_W - MENU_W) / 2
-MENU_Y :: PLOT_TY * TILE + 6
+MENU_Y :: PLOT_TY * TILE
 
 draw_shop_menu :: proc(f: ^Frame, g: ^Game) {
 	fill_rect(f, MENU_X, MENU_Y, MENU_W, MENU_H, COLOR_BLACK)
@@ -313,6 +313,18 @@ draw_shop_menu :: proc(f: ^Frame, g: ^Game) {
 			x += print(f, " (", x, y, COLOR_MID)
 			x += print(f, itoa(buf[:], energy_max(g)), x, y, COLOR_MID)
 			print(f, " a day)", x, y, COLOR_MID)
+		case .Stamina:
+			// "Stamina (tire every 10s)"
+			x := x0 + 10 + print(f, "Stamina", x0 + 10, y, label_color)
+			x += print(f, " (tire every ", x, y, COLOR_MID)
+			x += print(f, itoa(buf[:], int(idle_seconds(g))), x, y, COLOR_MID)
+			print(f, "s)", x, y, COLOR_MID)
+		case .Price:
+			// "Better price (1 a berry)"
+			x := x0 + 10 + print(f, "Better price", x0 + 10, y, label_color)
+			x += print(f, " (", x, y, COLOR_MID)
+			x += print(f, itoa(buf[:], berry_price(g)), x, y, COLOR_MID)
+			print(f, " a berry)", x, y, COLOR_MID)
 		case .Bush:
 			// "New bush (have 1 of 8)"
 			x := x0 + 10 + print(f, "New bush", x0 + 10, y, label_color)

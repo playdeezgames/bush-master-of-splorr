@@ -134,11 +134,15 @@ menu_buys_with_ok_and_leaves :: proc(t: ^testing.T) {
 	testing.expect(t, g.menu_open, "stays open after buying")
 	command(&g, .South)
 	command(&g, .South)
-	command(&g, .Act) // row 2: a bush for 50, but only 50 left
+	command(&g, .South)
+	command(&g, .South)
+	command(&g, .Act) // row 4: a bush for 50, but only 50 left
 	testing.expect_value(t, g.bush_count, 2)
 	command(&g, .Act) // the next bush costs 100: refused
 	testing.expect_value(t, g.bush_count, 2)
 	testing.expect_value(t, g.deny, 1 + int(Shop_Item.Bush))
+	command(&g, .North)
+	command(&g, .North)
 	command(&g, .North)
 	command(&g, .North)
 	command(&g, .North) // wraps round to Leave
@@ -160,4 +164,28 @@ version_2_save_loads :: proc(t: ^testing.T) {
 	testing.expect_value(t, h.hands_level, 2)
 	testing.expect_value(t, h.shop_x, PLOT_W - 1)
 	testing.expect_value(t, h.shop_y, 0)
+}
+
+@(test)
+better_price_pays_more_per_berry :: proc(t: ^testing.T) {
+	g: Game
+	init_game(&g)
+	p0, _ := price(&g, .Price)
+	testing.expect_value(t, p0, PRICE_PRICE_START)
+	g.jools = PRICE_PRICE_START
+	testing.expect(t, buy(&g, .Price), "bought")
+	testing.expect_value(t, g.jools, 0)
+	testing.expect_value(t, berry_price(&g), 2)
+	p1, _ := price(&g, .Price)
+	testing.expect_value(t, p1, PRICE_PRICE_START * 2)
+	testing.expect(t, !buy(&g, .Price), "short of jools")
+	testing.expect_value(t, g.deny, 1 + int(Shop_Item.Price))
+	// A load of 3 berries now earns 6.
+	g.carried = 3
+	g.px, g.py = g.basket_x - 1, g.basket_y
+	command(&g, .East)
+	testing.expect_value(t, g.jools, 6)
+	g.price_level = PRICE_MAX_LEVEL
+	_, more := price(&g, .Price)
+	testing.expect(t, !more, "maxed")
 }

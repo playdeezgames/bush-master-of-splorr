@@ -15,7 +15,7 @@ One fenced plot, one berry bush, one basket, and a million-jool mortgage. Pick b
 
 Yer plot is small and fenced in. On it grows one berry bush, and in the corner sits a basket. Pick the berries, carry them over, drop them in. Every berry in the basket is a jool. The bush grows its berries back, given time.
 
-Spend yer jools at the shop, the $ in the corner: bigger hands to carry more, more energy for longer days, and new bushes to pick from. Each one costs more than the last. And pay down the mortgage: a cool million jools at 10% a year, charged every night.
+Spend yer jools at the shop, the $ in the corner: bigger hands to carry more, more energy for longer days, stamina so standing about tires you slower, a better price for every berry, and new bushes to pick from. Each one costs more than the last. And pay down the mortgage: a cool million jools at 10% a year, charged every night.
 
 Picking and selling wear you out, and so does standing about: the day only lasts as long as yer energy. When yer energy runs dry, go to bed in the other corner; morning brings full energy, full bushes and a little more interest. Pay the mortgage off and the plot is yers.
 
