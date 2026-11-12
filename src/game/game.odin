@@ -33,7 +33,7 @@ Command :: enum {
 	West,
 	East,
 	Act, // OK: pick, deposit or open the shop beside you; in the shop menu, choose the row
-	Cancel, // leave the shop menu
+	Cancel, // leave the shop menu; on the plot, ask to start over
 }
 
 Bush :: struct {
@@ -249,6 +249,7 @@ command :: proc(g: ^Game, c: Command) {
 		d := DIRS[int(c)]
 		move(g, d.x, d.y)
 	case .Cancel:
+		ask_reset(g)
 	case .Act:
 		// The basket first when carrying (that is where berries go), then a bush, then the shop.
 		if g.carried > 0 {
@@ -395,7 +396,7 @@ load_game :: proc(g: ^Game, data: []u8) -> bool {
 	tmp.unused_walk = {}
 	tmp.menu_open = false
 	tmp.deny = 0
-	if tmp.notice > max(Notice) || tmp.notice < min(Notice) {
+	if tmp.notice > max(Notice) || tmp.notice < min(Notice) || tmp.notice == .Confirm_Reset {
 		tmp.notice = .None
 	}
 	g^ = tmp

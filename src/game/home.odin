@@ -27,6 +27,7 @@ Notice :: enum {
 	None,
 	Morning, // after a night's sleep: the day, the interest charged
 	Paid_Off, // the mortgage reached zero
+	Confirm_Reset, // Esc on the plot: "start over?", menu_row 0 is No, 1 is Yes
 }
 
 energy_max :: proc(g: ^Game) -> int {
@@ -122,7 +123,36 @@ pay_mortgage :: proc(g: ^Game) -> bool {
 }
 
 notice_command :: proc(g: ^Game, c: Command) {
+	if g.notice == .Confirm_Reset {
+		reset_command(g, c)
+		return
+	}
 	if c == .Act || c == .Cancel {
 		g.notice = .None
+	}
+}
+
+// Starting over (the user, November 12, 2026): Esc on the plot asks first, warning that everything
+// is forgotten. No is chosen to begin with; only Yes and Space wipe the game.
+ask_reset :: proc(g: ^Game) {
+	g.notice = .Confirm_Reset
+	g.menu_row = 0
+}
+
+reset_command :: proc(g: ^Game, c: Command) {
+	switch c {
+	case .North, .South, .West, .East:
+		g.menu_row = 1 - clamp(g.menu_row, 0, 1)
+	case .Act:
+		if g.menu_row == 1 {
+			init_game(g)
+		} else {
+			g.notice = .None
+		}
+	case .Cancel:
+		g.notice = .None
+	}
+	if g.notice == .None {
+		g.menu_row = 0
 	}
 }

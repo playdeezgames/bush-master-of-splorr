@@ -180,7 +180,7 @@ draw_game :: proc(f: ^Frame, g: ^Game) {
 		print_centered(f, "Walk into a bush to pick, the basket to sell,", hy, COLOR_LIGHT)
 	}
 	print_centered(f, "the $ to shop and the bed to sleep.", hy + 10, COLOR_LIGHT)
-	print_centered(f, "Arrows or WASD to walk, Space for OK, Esc to cancel.", hy + 20, COLOR_MID)
+	print_centered(f, "Arrows or WASD to walk, Space for OK, Esc: start over.", hy + 20, COLOR_MID)
 	if g.menu_open {
 		draw_shop_menu(f, g)
 	}
@@ -218,6 +218,10 @@ commas :: proc(buf: []u8, n: i64) -> string {
 
 // The morning after a night's sleep, or the mortgage paid off. Space or Esc carries on.
 draw_notice :: proc(f: ^Frame, g: ^Game) {
+	if g.notice == .Confirm_Reset {
+		draw_confirm_reset(f, g)
+		return
+	}
 	w, h := 264, 70
 	x0 := (SCREEN_W - w) / 2
 	y0 := PLOT_TY * TILE + 14
@@ -243,6 +247,7 @@ draw_notice :: proc(f: ^Frame, g: ^Game) {
 		} else {
 			print(f, "No mortgage to pay. The plot is yers.", x0 + 10, y0 + 34, COLOR_LIME)
 		}
+	case .Confirm_Reset:
 	case .Paid_Off:
 		draw_frame(f, x0, y0, w, h, COLOR_LIME)
 		print(f, "PAID OFF!", x0 + (w - text_width("PAID OFF!")) / 2, y0 + 8, COLOR_LIME)
@@ -253,6 +258,36 @@ draw_notice :: proc(f: ^Frame, g: ^Game) {
 		print(f, g.day == 1 ? " day." : " days.", x, y0 + 36, COLOR_LIGHT)
 	}
 	t := "Space to carry on."
+	print(f, t, x0 + (w - text_width(t)) / 2, y0 + h - 12, COLOR_MID)
+}
+
+// "Start over?": what is lost, then No (chosen first) and Yes.
+draw_confirm_reset :: proc(f: ^Frame, g: ^Game) {
+	w, h := 264, 100
+	x0 := (SCREEN_W - w) / 2
+	y0 := PLOT_TY * TILE + 4
+	fill_rect(f, x0, y0, w, h, COLOR_BLACK)
+	draw_frame(f, x0, y0, w, h, COLOR_RED)
+	title := "START OVER?"
+	print(f, title, x0 + (w - text_width(title)) / 2, y0 + 8, COLOR_RED)
+	print(f, "Everything is forgotten: yer jools,", x0 + 10, y0 + 22, COLOR_LIGHT)
+	print(f, "upgrades, bushes and days. The mortgage", x0 + 10, y0 + 32, COLOR_LIGHT)
+	print(f, "goes back to a million. No undo.", x0 + 10, y0 + 42, COLOR_LIGHT)
+	rows := [2]string{"No, keep playing", "Yes, start over"}
+	for r, i in rows {
+		y := y0 + 58 + i * 12
+		chosen := i == g.menu_row
+		if chosen {
+			fill_rect(f, x0 + 4, y - 2, w - 8, 11, COLOR_DARK)
+			print(f, ">", x0 + 10, y, COLOR_WHITE)
+		}
+		c: u8 = chosen ? COLOR_WHITE : COLOR_LIGHT
+		if i == 1 && chosen {
+			c = COLOR_RED
+		}
+		print(f, r, x0 + 20, y, c)
+	}
+	t := "Space confirms, Esc keeps playing."
 	print(f, t, x0 + (w - text_width(t)) / 2, y0 + h - 12, COLOR_MID)
 }
 

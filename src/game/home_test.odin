@@ -247,3 +247,41 @@ stamina_slows_the_idle_drain :: proc(t: ^testing.T) {
 	_, more := price(&g, .Stamina)
 	testing.expect(t, !more, "maxed")
 }
+
+@(test)
+esc_asks_before_starting_over :: proc(t: ^testing.T) {
+	g: Game
+	init_game(&g)
+	g.jools = 500
+	g.day = 9
+	g.hands_level = 3
+	command(&g, .Cancel)
+	testing.expect_value(t, g.notice, Notice.Confirm_Reset)
+	testing.expect_value(t, g.menu_row, 0) // No is chosen first
+	command(&g, .Act) // No: nothing lost
+	testing.expect_value(t, g.notice, Notice.None)
+	testing.expect_value(t, g.jools, 500)
+	command(&g, .Cancel)
+	command(&g, .South)
+	command(&g, .Cancel) // Esc backs out even with Yes chosen
+	testing.expect_value(t, g.jools, 500)
+	px := g.px
+	command(&g, .Cancel)
+	command(&g, .South) // moves the choice, not the bush master
+	testing.expect_value(t, g.px, px)
+	command(&g, .Act) // Yes
+	fresh: Game
+	init_game(&fresh)
+	testing.expect(t, g == fresh, "a fresh plot")
+}
+
+@(test)
+a_save_never_reopens_the_start_over_question :: proc(t: ^testing.T) {
+	g, h: Game
+	init_game(&g)
+	ask_reset(&g)
+	buf: [SAVE_CAP]u8
+	n := save_game(&g, buf[:])
+	testing.expect(t, load_game(&h, buf[:n]), "loads")
+	testing.expect_value(t, h.notice, Notice.None)
+}

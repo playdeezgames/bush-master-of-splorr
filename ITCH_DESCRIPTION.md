@@ -25,7 +25,7 @@ Picking and selling wear you out, and so does standing about: the day only lasts
 - **Gamepad:** d-pad or left stick to walk, A for OK, B to cancel.
 - **Touch:** the pads beside the screen walk, OK and Back.
 
-Yer plot is saved in the browser as you play. "Start over" under the screen begins a fresh one.
+Yer plot is saved in the browser as you play. To begin a fresh one, press Esc on the plot (or B, or Back): it warns you that everything is forgotten and asks you to confirm. "Start over" under the screen does the same.
 
 ### About it
 
