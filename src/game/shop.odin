@@ -22,6 +22,14 @@ STAMINA_MAX_LEVEL :: 20 // home.odin: each adds IDLE_DRAIN_STEP seconds
 PRICE_PRICE_START :: 250 // jools for the first +1 jool a berry (the dearest upgrade, the user's ask)
 PRICE_PRICE_GROWTH :: 2 // each one after costs twice the last
 PRICE_MAX_LEVEL :: 20
+PORT_PRICE_START :: 150 // a solar charging port; each one after costs twice the last
+ROBOT_PRICE_START :: 250 // a robot (needs a port of its own); each one after costs twice the last
+ROBOT_SPEED_PRICE_START :: 60 // each robot upgrade costs 3/2 of the last of its kind (rounded up)
+ROBOT_SPEED_MAX_LEVEL :: 12
+ROBOT_BATTERY_PRICE_START :: 50
+ROBOT_BATTERY_MAX_LEVEL :: 20
+ROBOT_CARRY_PRICE_START :: 40
+ROBOT_CARRY_MAX_LEVEL :: 20
 BUSH_PRICE_START :: 50 // jools for the first extra bush
 BUSH_PRICE_GROWTH :: 2 // each one after costs twice the last
 
@@ -35,7 +43,15 @@ Shop_Item :: enum {
 	Stamina,
 	Price,
 	Bush,
+	Port,
+	Robot,
+	Robot_Speed,
+	Robot_Battery,
+	Robot_Carry,
 }
+
+// The menu shows this many rows at a time and scrolls.
+MENU_SHOWN :: 7
 
 // The menu's rows: the items, Pay mortgage, then Leave.
 PAY_ROW :: len(Shop_Item)
@@ -90,6 +106,22 @@ price :: proc(g: ^Game, item: Shop_Item) -> (int, bool) {
 			p *= PRICE_PRICE_GROWTH
 		}
 		return p, true
+	case .Port:
+		if g.port_count >= PORT_CAP {
+			return 0, false
+		}
+		return doubling(PORT_PRICE_START, g.port_count), true
+	case .Robot:
+		if g.robot_count >= ROBOT_CAP {
+			return 0, false
+		}
+		return doubling(ROBOT_PRICE_START, g.robot_count), true
+	case .Robot_Speed:
+		return three_halves(ROBOT_SPEED_PRICE_START, g.robot_speed_level, ROBOT_SPEED_MAX_LEVEL)
+	case .Robot_Battery:
+		return three_halves(ROBOT_BATTERY_PRICE_START, g.robot_battery_level, ROBOT_BATTERY_MAX_LEVEL)
+	case .Robot_Carry:
+		return three_halves(ROBOT_CARRY_PRICE_START, g.robot_carry_level, ROBOT_CARRY_MAX_LEVEL)
 	case .Bush:
 		if g.bush_count >= len(BUSH_SPOTS) {
 			return 0, false
@@ -103,10 +135,35 @@ price :: proc(g: ^Game, item: Shop_Item) -> (int, bool) {
 	return 0, false
 }
 
+doubling :: proc(start, bought: int) -> int {
+	p := start
+	for _ in 0 ..< bought {
+		p *= 2
+	}
+	return p
+}
+
+// `start`, then 3/2 of the last (rounded up) for each one bought; none past `most`.
+three_halves :: proc(start, bought, most: int) -> (int, bool) {
+	if bought >= most {
+		return 0, false
+	}
+	p := start
+	for _ in 0 ..< bought {
+		p = (p * 3 + 1) / 2
+	}
+	return p, true
+}
+
+// A robot needs a port of its own.
+robot_needs_port :: proc(g: ^Game) -> bool {
+	return g.robot_count >= g.port_count && g.robot_count < ROBOT_CAP
+}
+
 // The next free bush spot, skipping one the bush master stands on.
 free_bush_spot :: proc(g: ^Game) -> (int, int, bool) {
 	for s in BUSH_SPOTS {
-		if bush_at(g, s.x, s.y) == nil && !(g.px == s.x && g.py == s.y) && !is_basket(g, s.x, s.y) && !is_shop(g, s.x, s.y) && !is_bed(g, s.x, s.y) {
+		if spot_free(g, s.x, s.y) {
 			return s.x, s.y, true
 		}
 	}
@@ -116,6 +173,7 @@ free_bush_spot :: proc(g: ^Game) -> (int, int, bool) {
 deny_row :: proc(g: ^Game, item: Shop_Item) {
 	g.deny = 1 + int(item)
 	g.deny_timer = 0.5
+	play(g, .Deny)
 }
 
 buy :: proc(g: ^Game, item: Shop_Item) -> bool {
@@ -134,6 +192,22 @@ buy :: proc(g: ^Game, item: Shop_Item) -> bool {
 		g.stamina_level += 1
 	case .Price:
 		g.price_level += 1
+	case .Port:
+		if !add_port(g) {
+			deny_row(g, item)
+			return false
+		}
+	case .Robot:
+		if !add_robot(g) {
+			deny_row(g, item)
+			return false
+		}
+	case .Robot_Speed:
+		g.robot_speed_level += 1
+	case .Robot_Battery:
+		g.robot_battery_level += 1
+	case .Robot_Carry:
+		g.robot_carry_level += 1
 	case .Bush:
 		x, y, free := free_bush_spot(g)
 		if !free || g.bush_count >= BUSH_CAP {
@@ -145,33 +219,53 @@ buy :: proc(g: ^Game, item: Shop_Item) -> bool {
 		add_pop(g, .New_Bush, 0, x, y)
 	}
 	g.jools -= cost
+	play(g, .Buy)
 	return true
 }
 
 open_shop :: proc(g: ^Game) {
 	g.menu_open = true
 	g.menu_row = 0
+	g.menu_top = 0
 	g.deny = 0
+	play(g, .Open)
+}
+
+// Keeps the chosen row on screen.
+scroll_menu :: proc(g: ^Game) {
+	if g.menu_row < g.menu_top {
+		g.menu_top = g.menu_row
+	}
+	if g.menu_row >= g.menu_top + MENU_SHOWN {
+		g.menu_top = g.menu_row - MENU_SHOWN + 1
+	}
 }
 
 shop_command :: proc(g: ^Game, c: Command) {
 	switch c {
 	case .North:
 		g.menu_row = (g.menu_row + SHOP_ROWS - 1) % SHOP_ROWS
+		scroll_menu(g)
+		play(g, .Move)
 	case .South:
 		g.menu_row = (g.menu_row + 1) % SHOP_ROWS
+		scroll_menu(g)
+		play(g, .Move)
 	case .West:
 		if g.menu_row == PAY_ROW {
 			g.pay_step = (g.pay_step + len(PAY_STEPS) - 1) % len(PAY_STEPS)
+			play(g, .Move)
 		}
 	case .East:
 		if g.menu_row == PAY_ROW {
 			g.pay_step = (g.pay_step + 1) % len(PAY_STEPS)
+			play(g, .Move)
 		}
 	case .Act:
 		switch g.menu_row {
 		case LEAVE_ROW:
 			g.menu_open = false
+			play(g, .Close)
 		case PAY_ROW:
 			pay_mortgage(g)
 		case:
@@ -179,5 +273,6 @@ shop_command :: proc(g: ^Game, c: Command) {
 		}
 	case .Cancel:
 		g.menu_open = false
+		play(g, .Close)
 	}
 }

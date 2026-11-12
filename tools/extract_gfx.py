@@ -24,6 +24,8 @@ PICKS = [
     ('Jools',   0, 46),   # a scatter of coins
     ('Specks',  5, 13),   # scattered brown specks, the plot's dirt
     ('Bed',     0, 36),   # a brown single bed
+    ('Robot', 102, 13),   # a little domed robot, the bush master's helpers
+    ('Solar',  67, 6),    # a solar panel on a stand: the robots' charging port
 ]
 
 def tile(col, row):

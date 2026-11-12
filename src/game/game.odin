@@ -25,7 +25,7 @@ PLOT_TY :: 5
 BUSH_CAP :: 16
 POP_CAP :: 8
 
-SAVE_VERSION :: 6 // older saves still load: see load_game
+SAVE_VERSION :: 7 // older saves still load: see load_game
 
 Command :: enum {
 	North,
@@ -33,7 +33,7 @@ Command :: enum {
 	West,
 	East,
 	Act, // OK: pick, deposit or open the shop beside you; in the shop menu, choose the row
-	Cancel, // leave the shop menu; on the plot, ask to start over
+	Cancel, // leave a menu; on the plot, open the Esc menu (sound, start over)
 }
 
 Bush :: struct {
@@ -94,6 +94,18 @@ Game :: struct {
 	// Added with the better price per berry and stamina (version 6).
 	price_level:        int, // price upgrades bought: each is +1 jool a berry
 	stamina_level:      int, // stamina upgrades bought: each slows the idle drain
+	// Added with robots and solar charging ports (version 7; robots.odin).
+	ports:              [PORT_CAP]Port,
+	port_count:         int,
+	robots:             [ROBOT_CAP]Robot, // robot i lives at port i
+	robot_count:        int,
+	robot_speed_level:  int,
+	robot_battery_level: int,
+	robot_carry_level:  int,
+	menu_top:           int, // the shop menu's first shown row (it scrolls)
+	muted:              bool, // no sound effects (the Esc menu)
+	sounds:             [SOUND_CAP]Sound, // this frame's sounds, for the page to play (not kept)
+	sound_count:        int,
 }
 
 init_game :: proc(g: ^Game) {
@@ -139,7 +151,7 @@ is_shop :: proc(g: ^Game, x, y: int) -> bool {
 }
 
 blocked :: proc(g: ^Game, x, y: int) -> bool {
-	return !in_plot(x, y) || bush_at(g, x, y) != nil || is_basket(g, x, y) || is_shop(g, x, y) || is_bed(g, x, y)
+	return !in_plot(x, y) || bush_at(g, x, y) != nil || is_basket(g, x, y) || is_shop(g, x, y) || is_bed(g, x, y) || port_at(g, x, y) >= 0
 }
 
 add_pop :: proc(g: ^Game, kind: Pop_Kind, amount, x, y: int) {
@@ -168,6 +180,7 @@ add_pop :: proc(g: ^Game, kind: Pop_Kind, amount, x, y: int) {
 pick :: proc(g: ^Game, b: ^Bush) {
 	if g.carried >= carry_max(g) {
 		add_pop(g, .Full, 0, g.px, g.py)
+		play(g, .Full)
 		return
 	}
 	if b.berries <= 0 {
@@ -183,6 +196,7 @@ pick :: proc(g: ^Game, b: ^Bush) {
 	g.carried += 1
 	g.picked += 1
 	add_pop(g, .Berry, 1, b.x, b.y)
+	play(g, .Pick)
 }
 
 // Drops everything carried into the basket: the berry price each (shop.odin).
@@ -196,6 +210,7 @@ deposit :: proc(g: ^Game) {
 	pay := g.carried * berry_price(g)
 	g.jools += pay
 	add_pop(g, .Jools, pay, g.basket_x, g.basket_y)
+	play(g, .Sell)
 	g.carried = 0
 }
 
@@ -249,7 +264,7 @@ command :: proc(g: ^Game, c: Command) {
 		d := DIRS[int(c)]
 		move(g, d.x, d.y)
 	case .Cancel:
-		ask_reset(g)
+		open_system_menu(g)
 	case .Act:
 		// The basket first when carrying (that is where berries go), then a bush, then the shop.
 		if g.carried > 0 {
@@ -301,6 +316,9 @@ tick :: proc(g: ^Game, seconds: f64) -> bool {
 			changed = true
 		}
 	}
+	if tick_robots(g, dt) {
+		changed = true
+	}
 	if idle_drain(g, dt) {
 		changed = true
 	}
@@ -347,13 +365,14 @@ itoa64 :: proc(buf: []u8, n: i64) -> string {
 // Saves are the Game's bytes; a save of another size or version is not read. Fields are only ever
 // added at the end of Game, so an older save is a prefix: version 1 (before the shop) ends at
 // `hands_level`, version 2 (the shop panel) at `shop_x`, version 3 (the shop menu) at `bed_x`, version 4 (the mortgage)
-// at `energy_level`, version 5 (the energy upgrade) at `price_level`. They load with the new fields defaulted.
+// at `energy_level`, version 5 (the energy upgrade) at `price_level`, version 6 (better price, stamina) at `ports`. They load with the new fields defaulted.
 SAVE_CAP :: size_of(Game)
 SAVE_V1_SIZE :: int(offset_of(Game, hands_level))
 SAVE_V2_SIZE :: int(offset_of(Game, shop_x))
 SAVE_V3_SIZE :: int(offset_of(Game, bed_x))
 SAVE_V4_SIZE :: int(offset_of(Game, energy_level))
 SAVE_V5_SIZE :: int(offset_of(Game, price_level))
+SAVE_V6_SIZE :: int(offset_of(Game, ports))
 
 save_game :: proc(g: ^Game, out: []u8) -> int {
 	if len(out) < size_of(Game) {
@@ -368,6 +387,8 @@ load_game :: proc(g: ^Game, data: []u8) -> bool {
 	switch len(data) {
 	case size_of(Game):
 		want = SAVE_VERSION
+	case SAVE_V6_SIZE:
+		want = 6
 	case SAVE_V5_SIZE:
 		want = 5
 	case SAVE_V4_SIZE:
@@ -393,10 +414,13 @@ load_game :: proc(g: ^Game, data: []u8) -> bool {
 		start_home(&tmp)
 	}
 	tmp.version = SAVE_VERSION
+	tmp.port_count = clamp(tmp.port_count, 0, PORT_CAP)
+	tmp.robot_count = clamp(tmp.robot_count, 0, tmp.port_count)
+	tmp.sound_count = 0
 	tmp.unused_walk = {}
 	tmp.menu_open = false
 	tmp.deny = 0
-	if tmp.notice > max(Notice) || tmp.notice < min(Notice) || tmp.notice == .Confirm_Reset {
+	if tmp.notice > max(Notice) || tmp.notice < min(Notice) || tmp.notice == .Confirm_Reset || tmp.notice == .System {
 		tmp.notice = .None
 	}
 	g^ = tmp

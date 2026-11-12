@@ -89,6 +89,26 @@ draw_game :: proc(f: ^Frame, g: ^Game) {
 		print(f, "$", sx + 3, sy + 2, COLOR_YELLOW)
 		print(f, "$", sx + 4, sy + 2, COLOR_YELLOW)
 	}
+	// Solar ports, each with a bar of its stored charge (dim at night).
+	night := is_night(g)
+	for i in 0 ..< g.port_count {
+		p := g.ports[i]
+		sx, sy := tile_px(p.x, p.y)
+		draw_gfx(f, .Solar, sx, sy, night ? COLOR_MID : COLOR_CYAN)
+		draw_bar(f, sx, sy + TILE - 1, int(p.charge), int(PORT_STORE), COLOR_YELLOW)
+	}
+	// Robots, with their berries over their heads and a battery bar under them.
+	full := int(robot_battery_max(g))
+	for i in 0 ..< g.robot_count {
+		r := g.robots[i]
+		sx, sy := tile_px(r.x, r.y)
+		draw_gfx(f, .Robot, sx, sy, COLOR_LIGHT)
+		for k in 0 ..< min(r.carried, 5) {
+			fill_rect(f, sx + 1 + k * 2, sy - 3, 2, 2, k % 2 == 0 ? COLOR_RED : COLOR_ORANGE)
+		}
+		b := int(r.battery)
+		draw_bar(f, sx, sy + TILE, b, full, b * 4 > full ? COLOR_LIME : COLOR_RED)
+	}
 	// The bush master, with what they carry as dots over their head.
 	{
 		sx, sy := tile_px(g.px, g.py)
@@ -180,7 +200,7 @@ draw_game :: proc(f: ^Frame, g: ^Game) {
 		print_centered(f, "Walk into a bush to pick, the basket to sell,", hy, COLOR_LIGHT)
 	}
 	print_centered(f, "the $ to shop and the bed to sleep.", hy + 10, COLOR_LIGHT)
-	print_centered(f, "Arrows or WASD to walk, Space for OK, Esc: start over.", hy + 20, COLOR_MID)
+	print_centered(f, "Arrows or WASD to walk, Space for OK, Esc for menu.", hy + 20, COLOR_MID)
 	if g.menu_open {
 		draw_shop_menu(f, g)
 	}
@@ -222,6 +242,10 @@ draw_notice :: proc(f: ^Frame, g: ^Game) {
 		draw_confirm_reset(f, g)
 		return
 	}
+	if g.notice == .System {
+		draw_system_menu(f, g)
+		return
+	}
 	w, h := 264, 70
 	x0 := (SCREEN_W - w) / 2
 	y0 := PLOT_TY * TILE + 14
@@ -247,7 +271,7 @@ draw_notice :: proc(f: ^Frame, g: ^Game) {
 		} else {
 			print(f, "No mortgage to pay. The plot is yers.", x0 + 10, y0 + 34, COLOR_LIME)
 		}
-	case .Confirm_Reset:
+	case .Confirm_Reset, .System:
 	case .Paid_Off:
 		draw_frame(f, x0, y0, w, h, COLOR_LIME)
 		print(f, "PAID OFF!", x0 + (w - text_width("PAID OFF!")) / 2, y0 + 8, COLOR_LIME)
@@ -258,6 +282,37 @@ draw_notice :: proc(f: ^Frame, g: ^Game) {
 		print(f, g.day == 1 ? " day." : " days.", x, y0 + 36, COLOR_LIGHT)
 	}
 	t := "Space to carry on."
+	print(f, t, x0 + (w - text_width(t)) / 2, y0 + h - 12, COLOR_MID)
+}
+
+// The Esc menu: Carry on, Sound On/Off, Start over.
+draw_system_menu :: proc(f: ^Frame, g: ^Game) {
+	w, h := 200, 76
+	x0 := (SCREEN_W - w) / 2
+	y0 := PLOT_TY * TILE + 14
+	fill_rect(f, x0, y0, w, h, COLOR_BLACK)
+	draw_frame(f, x0, y0, w, h, COLOR_LIGHT)
+	title := "MENU"
+	print(f, title, x0 + (w - text_width(title)) / 2, y0 + 8, COLOR_WHITE)
+	for i in 0 ..< SYSTEM_ROWS {
+		y := y0 + 22 + i * 12
+		chosen := i == g.menu_row
+		if chosen {
+			fill_rect(f, x0 + 4, y - 2, w - 8, 11, COLOR_DARK)
+			print(f, ">", x0 + 10, y, COLOR_WHITE)
+		}
+		c: u8 = chosen ? COLOR_WHITE : COLOR_LIGHT
+		switch i {
+		case 0:
+			print(f, "Carry on", x0 + 20, y, c)
+		case SYSTEM_SOUND_ROW:
+			x := x0 + 20 + print(f, "Sound: ", x0 + 20, y, c)
+			print(f, g.muted ? "Off" : "On", x, y, g.muted ? COLOR_RED : COLOR_LIME)
+		case SYSTEM_RESET_ROW:
+			print(f, "Start over...", x0 + 20, y, chosen ? COLOR_RED : c)
+		}
+	}
+	t := "Space chooses, Esc goes back."
 	print(f, t, x0 + (w - text_width(t)) / 2, y0 + h - 12, COLOR_MID)
 }
 
@@ -291,6 +346,25 @@ draw_confirm_reset :: proc(f: ^Frame, g: ^Game) {
 	print(f, t, x0 + (w - text_width(t)) / 2, y0 + h - 12, COLOR_MID)
 }
 
+// "Solar port (have 1 of 4)"
+label_count :: proc(f: ^Frame, label: string, have, most, x, y: int, color: u8) {
+	buf: [16]u8
+	xx := x + print(f, label, x, y, color)
+	xx += print(f, " (have ", xx, y, COLOR_MID)
+	xx += print(f, itoa(buf[:], have), xx, y, COLOR_MID)
+	xx += print(f, " of ", xx, y, COLOR_MID)
+	xx += print(f, itoa(buf[:], most), xx, y, COLOR_MID)
+	print(f, ")", xx, y, COLOR_MID)
+}
+
+// A one-pixel bar, a tile wide, of `have` out of `most`.
+draw_bar :: proc(f: ^Frame, x, y, have, most: int, c: u8) {
+	fill_rect(f, x + 1, y, TILE - 2, 1, COLOR_BLACK)
+	if most > 0 {
+		fill_rect(f, x + 1, y, clamp(have * (TILE - 2) / most, 0, TILE - 2), 1, c)
+	}
+}
+
 draw_frame :: proc(f: ^Frame, x, y, w, h: int, c: u8) {
 	fill_rect(f, x, y, w, 1, c)
 	fill_rect(f, x, y + h - 1, w, 1, c)
@@ -318,8 +392,15 @@ draw_shop_menu :: proc(f: ^Frame, g: ^Game) {
 		x += print(f, "Jools ", x, MENU_Y + 6, COLOR_LIGHT)
 		print(f, n, x, MENU_Y + 6, COLOR_YELLOW)
 	}
-	for row in 0 ..< SHOP_ROWS {
-		y := MENU_Y + 22 + row * 12
+	// Arrows when there is more above or below.
+	if g.menu_top > 0 {
+		print(f, "^", MENU_X + MENU_W / 2, MENU_Y + 14, COLOR_MID)
+	}
+	if g.menu_top + MENU_SHOWN < SHOP_ROWS {
+		print(f, "v", MENU_X + MENU_W / 2, MENU_Y + 22 + MENU_SHOWN * 12 - 3, COLOR_MID)
+	}
+	for row in g.menu_top ..< min(g.menu_top + MENU_SHOWN, SHOP_ROWS) {
+		y := MENU_Y + 22 + (row - g.menu_top) * 12
 		chosen := row == g.menu_row
 		if chosen {
 			fill_rect(f, MENU_X + 4, y - 2, MENU_W - 8, 11, COLOR_DARK)
@@ -360,6 +441,29 @@ draw_shop_menu :: proc(f: ^Frame, g: ^Game) {
 			x += print(f, " (", x, y, COLOR_MID)
 			x += print(f, itoa(buf[:], berry_price(g)), x, y, COLOR_MID)
 			print(f, " a berry)", x, y, COLOR_MID)
+		case .Port:
+			label_count(f, "Solar port", g.port_count, PORT_CAP, x0 + 10, y, label_color)
+		case .Robot:
+			label_count(f, "Robot", g.robot_count, ROBOT_CAP, x0 + 10, y, label_color)
+		case .Robot_Speed:
+			// "Robot speed (1.5 a sec)"
+			x := x0 + 10 + print(f, "Robot speed", x0 + 10, y, label_color)
+			x += print(f, " (", x, y, COLOR_MID)
+			tenths := int(robot_speed(g) * 10 + 0.5)
+			x += print(f, itoa(buf[:], tenths / 10), x, y, COLOR_MID)
+			x += print(f, ".", x, y, COLOR_MID)
+			x += print(f, itoa(buf[:], tenths % 10), x, y, COLOR_MID)
+			print(f, " a sec)", x, y, COLOR_MID)
+		case .Robot_Battery:
+			x := x0 + 10 + print(f, "Robot battery", x0 + 10, y, label_color)
+			x += print(f, " (", x, y, COLOR_MID)
+			x += print(f, itoa(buf[:], int(robot_battery_max(g))), x, y, COLOR_MID)
+			print(f, ")", x, y, COLOR_MID)
+		case .Robot_Carry:
+			x := x0 + 10 + print(f, "Robot hands", x0 + 10, y, label_color)
+			x += print(f, " (holds ", x, y, COLOR_MID)
+			x += print(f, itoa(buf[:], robot_carry_max(g)), x, y, COLOR_MID)
+			print(f, ")", x, y, COLOR_MID)
 		case .Bush:
 			// "New bush (have 1 of 8)"
 			x := x0 + 10 + print(f, "New bush", x0 + 10, y, label_color)
@@ -372,8 +476,13 @@ draw_shop_menu :: proc(f: ^Frame, g: ^Game) {
 		cost, ok := price(g, item)
 		right := MENU_X + MENU_W - 10
 		if !ok {
-			t := item == .Bush ? "plot full" : "maxed"
+			t := item == .Bush ? "plot full" : item == .Port || item == .Robot ? "all built" : "maxed"
 			print(f, t, right - text_width(t), y, COLOR_MID)
+			continue
+		}
+		if item == .Robot && robot_needs_port(g) {
+			t := "needs a port"
+			print(f, t, right - text_width(t), y, g.deny == 1 + int(item) ? COLOR_RED : COLOR_MID)
 			continue
 		}
 		color: u8 = g.jools >= cost ? COLOR_YELLOW : COLOR_MID
@@ -385,7 +494,7 @@ draw_shop_menu :: proc(f: ^Frame, g: ^Game) {
 		x += print(f, n, x, y, color)
 		print(f, " J", x, y, color)
 	}
-	hint := g.deny != 0 ? "Not enough jools!" : g.menu_row == PAY_ROW ? "Left/Right: how much. Space pays." : "Up/Down choose, Space buys, Esc leaves."
+	hint := g.deny == 1 + int(Shop_Item.Robot) && robot_needs_port(g) ? "Buy a solar port first!" : g.deny != 0 ? "Not enough jools!" : g.menu_row == PAY_ROW ? "Left/Right: how much. Space pays." : "Up/Down choose, Space buys, Esc leaves."
 	hc: u8 = g.deny != 0 ? COLOR_RED : COLOR_MID
 	print(f, hint, MENU_X + (MENU_W - text_width(hint)) / 2, MENU_Y + MENU_H - 14, hc)
 }

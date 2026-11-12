@@ -105,6 +105,62 @@
 		store(() => localStorage.removeItem(SAVE_KEY));
 	});
 
+	// Sound effects: small synthesised blips, one entry per game.Sound (src/game/sound.odin), in that
+	// order. Each is a list of notes [start Hz, end Hz, ms, wave, volume] played one after another.
+	// The game decides what plays and handles mute (Esc menu); the page only plays the queue.
+	const SOUNDS = [
+		[[880, 1320, 50, "square", 0.10]],                                         // Pick
+		[[660, 660, 50, "square", 0.10], [990, 990, 80, "square", 0.10]],          // Sell
+		[[220, 180, 90, "square", 0.08]],                                          // Full
+		[[330, 160, 220, "triangle", 0.18]],                                       // Tired
+		[[523, 523, 60, "square", 0.09], [659, 659, 60, "square", 0.09], [784, 784, 100, "square", 0.09]], // Buy
+		[[140, 110, 140, "sawtooth", 0.07]],                                       // Deny
+		[[1200, 1200, 20, "square", 0.04]],                                        // Move
+		[[600, 900, 60, "triangle", 0.12]],                                        // Open
+		[[900, 600, 60, "triangle", 0.12]],                                        // Close
+		[[392, 392, 160, "triangle", 0.15], [330, 330, 160, "triangle", 0.15], [262, 262, 320, "triangle", 0.15]], // Sleep
+		[[1046, 1046, 40, "square", 0.08], [1318, 1318, 70, "square", 0.08]],      // Pay
+		[[523, 523, 120, "square", 0.10], [659, 659, 120, "square", 0.10], [784, 784, 120, "square", 0.10], [1046, 1046, 360, "square", 0.10]], // Paid_Off
+		[[1400, 1800, 30, "square", 0.03]],                                        // Robot_Pick
+		[[700, 700, 40, "square", 0.04], [1050, 1050, 50, "square", 0.04]],        // Robot_Sell
+		[[400, 80, 400, "sawtooth", 0.10]],                                        // Reset
+	];
+	let audio = null;
+	function unlockAudio() {
+		if (audio) { if (audio.state === "suspended") audio.resume(); return; }
+		const AC = window.AudioContext || window.webkitAudioContext;
+		if (AC) audio = new AC();
+	}
+	window.addEventListener("keydown", unlockAudio);
+	window.addEventListener("pointerdown", unlockAudio);
+	function playSound(id) {
+		const notes = SOUNDS[id];
+		if (!audio || !notes || audio.state !== "running") return;
+		let t = audio.currentTime + 0.005;
+		for (const [f0, f1, ms, type, vol] of notes) {
+			const osc = audio.createOscillator(), gain = audio.createGain(), end = t + ms / 1000;
+			osc.type = type;
+			osc.frequency.setValueAtTime(f0, t);
+			osc.frequency.linearRampToValueAtTime(f1, end);
+			gain.gain.setValueAtTime(vol, t);
+			gain.gain.exponentialRampToValueAtTime(0.0001, end);
+			osc.connect(gain).connect(audio.destination);
+			osc.start(t);
+			osc.stop(end + 0.01);
+			t = end;
+		}
+	}
+	function drainSounds() {
+		const n = ex.platform_sound_count();
+		const seen = new Set();
+		for (let i = 0; i < n; i++) {
+			const id = ex.platform_sound(i);
+			if (!seen.has(id)) playSound(id); // one of each a frame: robots stay polite
+			seen.add(id);
+		}
+		if (n > 0) ex.platform_sounds_clear();
+	}
+
 	// game.Command order (src/game/game.odin): North South West East Act Cancel. The controls are only
 	// these six (the user's rule): arrows or WASD, Space for OK, Esc to cancel.
 	const C = { N: 0, S: 1, W: 2, E: 3, OK: 4, CANCEL: 5 };
@@ -168,7 +224,7 @@
 		else if (d >= 0 && ++pad.frames >= 12) { pad.frames = 6; ex.platform_command(d); }
 		[[0, C.OK], [1, C.CANCEL]].forEach(([i, c]) => {
 			const now = !!(gp.buttons[i] && gp.buttons[i].pressed);
-			if (now && !pad.buttons[i]) ex.platform_command(c);
+			if (now && !pad.buttons[i]) { unlockAudio(); ex.platform_command(c); }
 			pad.buttons[i] = now;
 		});
 	}
@@ -177,6 +233,7 @@
 	const image = ctx.createImageData(W, H);
 	function frame() {
 		pollPad();
+		drainSounds();
 		if (ex.platform_frame_ready()) {
 			// Read the buffer after the call: wasm memory may have grown.
 			image.data.set(new Uint8Array(memory.memory.buffer, ex.platform_frame_ptr(), W * H * 4));

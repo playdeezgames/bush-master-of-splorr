@@ -27,8 +27,13 @@ Notice :: enum {
 	None,
 	Morning, // after a night's sleep: the day, the interest charged
 	Paid_Off, // the mortgage reached zero
-	Confirm_Reset, // Esc on the plot: "start over?", menu_row 0 is No, 1 is Yes
+	Confirm_Reset, // "start over?", menu_row 0 is No, 1 is Yes
+	System, // the Esc menu: Carry on, Sound on/off, Start over (menu_row)
 }
+
+SYSTEM_ROWS :: 3
+SYSTEM_SOUND_ROW :: 1
+SYSTEM_RESET_ROW :: 2
 
 energy_max :: proc(g: ^Game) -> int {
 	return ENERGY_START + g.energy_level * ENERGY_UPGRADE
@@ -66,6 +71,7 @@ is_bed :: proc(g: ^Game, x, y: int) -> bool {
 spend_energy :: proc(g: ^Game, cost: int) -> bool {
 	if g.energy < cost {
 		add_pop(g, .Tired, 0, g.px, g.py)
+		play(g, .Tired)
 		return false
 	}
 	g.energy -= cost
@@ -92,6 +98,7 @@ sleep :: proc(g: ^Game) {
 	g.last_interest = nightly_interest(g.mortgage)
 	g.mortgage += g.last_interest
 	g.notice = .Morning
+	play(g, .Sleep)
 }
 
 // What the chosen pay step pays: "all" is every jool on hand, a fixed step is that many; neither
@@ -111,6 +118,7 @@ pay_mortgage :: proc(g: ^Game) -> bool {
 	if amount <= 0 || i64(g.jools) < amount {
 		g.deny = 1 + PAY_ROW
 		g.deny_timer = 0.5
+		play(g, .Deny)
 		return false
 	}
 	g.jools -= int(amount)
@@ -118,6 +126,9 @@ pay_mortgage :: proc(g: ^Game) -> bool {
 	if g.mortgage == 0 {
 		g.menu_open = false
 		g.notice = .Paid_Off
+		play(g, .Paid_Off)
+	} else {
+		play(g, .Pay)
 	}
 	return true
 }
@@ -127,13 +138,68 @@ notice_command :: proc(g: ^Game, c: Command) {
 		reset_command(g, c)
 		return
 	}
+	if g.notice == .System {
+		system_command(g, c)
+		return
+	}
 	if c == .Act || c == .Cancel {
 		g.notice = .None
+		play(g, .Close)
 	}
 }
 
-// Starting over (the user, November 12, 2026): Esc on the plot asks first, warning that everything
-// is forgotten. No is chosen to begin with; only Yes and Space wipe the game.
+// The Esc menu on the plot: carry on, sound on or off, start over.
+open_system_menu :: proc(g: ^Game) {
+	g.notice = .System
+	g.menu_row = 0
+	play(g, .Open)
+}
+
+system_command :: proc(g: ^Game, c: Command) {
+	switch c {
+	case .North:
+		g.menu_row = (g.menu_row + SYSTEM_ROWS - 1) % SYSTEM_ROWS
+		play(g, .Move)
+	case .South:
+		g.menu_row = (g.menu_row + 1) % SYSTEM_ROWS
+		play(g, .Move)
+	case .West, .East:
+		if g.menu_row == SYSTEM_SOUND_ROW {
+			toggle_mute(g)
+		}
+	case .Act:
+		switch g.menu_row {
+		case SYSTEM_SOUND_ROW:
+			toggle_mute(g)
+		case SYSTEM_RESET_ROW:
+			ask_reset(g)
+		case:
+			g.notice = .None
+			g.menu_row = 0
+			play(g, .Close)
+		}
+	case .Cancel:
+		g.notice = .None
+		g.menu_row = 0
+		play(g, .Close)
+	}
+}
+
+toggle_mute :: proc(g: ^Game) {
+	g.muted = !g.muted
+	play(g, .Move) // heard only when turning sound on
+}
+
+// Starts over, keeping only whether sound is muted.
+reset_game :: proc(g: ^Game) {
+	muted := g.muted
+	init_game(g)
+	g.muted = muted
+	play(g, .Reset)
+}
+
+// Starting over (the user, November 12, 2026): from the Esc menu, asking first and warning that
+// everything is forgotten. No is chosen to begin with; only Yes and Space wipe the game.
 ask_reset :: proc(g: ^Game) {
 	g.notice = .Confirm_Reset
 	g.menu_row = 0
@@ -143,14 +209,17 @@ reset_command :: proc(g: ^Game, c: Command) {
 	switch c {
 	case .North, .South, .West, .East:
 		g.menu_row = 1 - clamp(g.menu_row, 0, 1)
+		play(g, .Move)
 	case .Act:
 		if g.menu_row == 1 {
-			init_game(g)
+			reset_game(g)
 		} else {
 			g.notice = .None
+			play(g, .Close)
 		}
 	case .Cancel:
 		g.notice = .None
+		play(g, .Close)
 	}
 	if g.notice == .None {
 		g.menu_row = 0

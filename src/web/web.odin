@@ -51,8 +51,28 @@ platform_command :: proc "c" (command: i32) {
 @(export)
 platform_restart :: proc "c" () {
 	context = runtime.default_context()
-	game.init_game(&state.rules)
+	game.reset_game(&state.rules)
 	state.dirty = true
+}
+
+// This frame's sound effects (game.Sound values), for the page to play; it then calls
+// platform_sounds_clear. A muted game queues none.
+@(export)
+platform_sound_count :: proc "c" () -> i32 {
+	return i32(state.rules.sound_count)
+}
+
+@(export)
+platform_sound :: proc "c" (i: i32) -> i32 {
+	if i < 0 || int(i) >= state.rules.sound_count {
+		return -1
+	}
+	return i32(state.rules.sounds[i])
+}
+
+@(export)
+platform_sounds_clear :: proc "c" () {
+	state.rules.sound_count = 0
 }
 
 // Copies the game into the save buffer; returns its length for the page to store.

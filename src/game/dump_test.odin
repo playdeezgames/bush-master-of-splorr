@@ -26,6 +26,10 @@ dump_play :: proc(t: ^testing.T) {
 		g.energy = 62
 		g.day = 3
 		g.mortgage = 1_000_548
+		add_port(&g)
+		add_robot(&g)
+		g.ports[0].charge = 70
+		g.robots[0] = {x = 5, y = 3, battery = 41, carried = 1}
 		add_pop(&g, .Jools, 3, g.basket_x, g.basket_y)
 		g.pops[0].age = 0.3
 		f := new(Frame)

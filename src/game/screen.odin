@@ -47,6 +47,8 @@ Gfx :: enum {
 	Jools,
 	Specks,
 	Bed,
+	Robot,
+	Solar,
 }
 
 cls :: proc(f: ^Frame, c: u8) {

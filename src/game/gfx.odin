@@ -2,10 +2,10 @@
 // Urizen 1-bit tileset by vurmux, https://vurmux.itch.io/urizen-onebit-tileset, CC0 1.0.
 package game
 
-GFX_COUNT :: 9
+GFX_COUNT :: 11
 
 // One 12x12 mask per picture, one bit per pixel: bit (y*12 + x) of the three u64s, 48 bits each.
-GFX := [9][3]u64{
+GFX := [11][3]u64{
 	{0x020010000000, 0x148144240020, 0x000000010110}, // Grass (3, 9)
 	{0xD349A6104000, 0x924000FFE924, 0x924924000FFE}, // Fence (6, 40)
 	{0x5A07B4318000, 0x62C3F01BA06C, 0x0002221765DE}, // Bush (18, 9)
@@ -15,4 +15,6 @@ GFX := [9][3]u64{
 	{0x048048030000, 0x48C480300030, 0x00000C012312}, // Jools (0, 46)
 	{0x180100808000, 0x02C218010002, 0x020600400056}, // Specks (5, 13)
 	{0x2042F40F0000, 0x3FC3FC3FC1F8, 0x30C0003FC000}, // Bed (0, 36)
+	{0x0E0000000000, 0x1F00001F01B0, 0xE0E4E45F45F4}, // Robot (102, 13)
+	{0x000000000000, 0x1DC3B8770EE0, 0x0200200000EE}, // Solar (67, 6)
 }

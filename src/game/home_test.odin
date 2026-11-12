@@ -255,23 +255,33 @@ esc_asks_before_starting_over :: proc(t: ^testing.T) {
 	g.jools = 500
 	g.day = 9
 	g.hands_level = 3
+	g.muted = true
+	ask := proc(g: ^Game) {
+		command(g, .Cancel) // the Esc menu
+		command(g, .North) // up wraps to Start over
+		command(g, .Act)
+	}
 	command(&g, .Cancel)
+	testing.expect_value(t, g.notice, Notice.System)
+	command(&g, .Cancel)
+	ask(&g)
 	testing.expect_value(t, g.notice, Notice.Confirm_Reset)
 	testing.expect_value(t, g.menu_row, 0) // No is chosen first
 	command(&g, .Act) // No: nothing lost
 	testing.expect_value(t, g.notice, Notice.None)
 	testing.expect_value(t, g.jools, 500)
-	command(&g, .Cancel)
+	ask(&g)
 	command(&g, .South)
 	command(&g, .Cancel) // Esc backs out even with Yes chosen
 	testing.expect_value(t, g.jools, 500)
 	px := g.px
-	command(&g, .Cancel)
+	ask(&g)
 	command(&g, .South) // moves the choice, not the bush master
 	testing.expect_value(t, g.px, px)
 	command(&g, .Act) // Yes
 	fresh: Game
 	init_game(&fresh)
+	fresh.muted = true // the only thing kept
 	testing.expect(t, g == fresh, "a fresh plot")
 }
 
@@ -284,4 +294,31 @@ a_save_never_reopens_the_start_over_question :: proc(t: ^testing.T) {
 	n := save_game(&g, buf[:])
 	testing.expect(t, load_game(&h, buf[:n]), "loads")
 	testing.expect_value(t, h.notice, Notice.None)
+}
+
+@(test)
+sounds_queue_unless_muted :: proc(t: ^testing.T) {
+	g: Game
+	init_game(&g)
+	g.px, g.py = 3, 3 // below the bush
+	command(&g, .Act)
+	testing.expect_value(t, g.sound_count, 1)
+	testing.expect_value(t, g.sounds[0], Sound.Pick)
+	g.sound_count = 0
+	// Mute from the Esc menu.
+	command(&g, .Cancel)
+	command(&g, .South)
+	command(&g, .Act)
+	testing.expect(t, g.muted, "muted")
+	command(&g, .Cancel)
+	g.sound_count = 0
+	command(&g, .Act)
+	testing.expect_value(t, g.carried, 2)
+	testing.expect_value(t, g.sound_count, 0)
+	// And back on; the switch itself is heard.
+	command(&g, .Cancel)
+	command(&g, .South)
+	command(&g, .East)
+	testing.expect(t, !g.muted, "sound on")
+	testing.expect_value(t, g.sounds[g.sound_count - 1], Sound.Move)
 }
