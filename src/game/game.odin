@@ -25,7 +25,7 @@ PLOT_TY :: 5
 BUSH_CAP :: 16
 POP_CAP :: 8
 
-SAVE_VERSION :: 7 // older saves still load: see load_game
+SAVE_VERSION :: 8 // older saves still load: see load_game
 
 Command :: enum {
 	North,
@@ -106,6 +106,8 @@ Game :: struct {
 	muted:              bool, // no sound effects (the Esc menu)
 	sounds:             [SOUND_CAP]Sound, // this frame's sounds, for the page to play (not kept)
 	sound_count:        int,
+	// Added with the solar rate upgrade (version 8).
+	solar_level:        int, // solar rate upgrades bought
 }
 
 init_game :: proc(g: ^Game) {
@@ -365,7 +367,7 @@ itoa64 :: proc(buf: []u8, n: i64) -> string {
 // Saves are the Game's bytes; a save of another size or version is not read. Fields are only ever
 // added at the end of Game, so an older save is a prefix: version 1 (before the shop) ends at
 // `hands_level`, version 2 (the shop panel) at `shop_x`, version 3 (the shop menu) at `bed_x`, version 4 (the mortgage)
-// at `energy_level`, version 5 (the energy upgrade) at `price_level`, version 6 (better price, stamina) at `ports`. They load with the new fields defaulted.
+// at `energy_level`, version 5 (the energy upgrade) at `price_level`, version 6 (better price, stamina) at `ports`, version 7 (robots) at `solar_level`. They load with the new fields defaulted.
 SAVE_CAP :: size_of(Game)
 SAVE_V1_SIZE :: int(offset_of(Game, hands_level))
 SAVE_V2_SIZE :: int(offset_of(Game, shop_x))
@@ -373,6 +375,7 @@ SAVE_V3_SIZE :: int(offset_of(Game, bed_x))
 SAVE_V4_SIZE :: int(offset_of(Game, energy_level))
 SAVE_V5_SIZE :: int(offset_of(Game, price_level))
 SAVE_V6_SIZE :: int(offset_of(Game, ports))
+SAVE_V7_SIZE :: int(offset_of(Game, solar_level))
 
 save_game :: proc(g: ^Game, out: []u8) -> int {
 	if len(out) < size_of(Game) {
@@ -387,6 +390,8 @@ load_game :: proc(g: ^Game, data: []u8) -> bool {
 	switch len(data) {
 	case size_of(Game):
 		want = SAVE_VERSION
+	case SAVE_V7_SIZE:
+		want = 7
 	case SAVE_V6_SIZE:
 		want = 6
 	case SAVE_V5_SIZE:

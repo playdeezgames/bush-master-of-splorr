@@ -23,6 +23,8 @@ PRICE_PRICE_START :: 250 // jools for the first +1 jool a berry (the dearest upg
 PRICE_PRICE_GROWTH :: 2 // each one after costs twice the last
 PRICE_MAX_LEVEL :: 20
 PORT_PRICE_START :: 150 // a solar charging port; each one after costs twice the last
+SOLAR_PRICE_START :: 80 // a faster solar rate for every port; each costs 3/2 of the last
+SOLAR_MAX_LEVEL :: 20
 ROBOT_PRICE_START :: 250 // a robot (needs a port of its own); each one after costs twice the last
 ROBOT_SPEED_PRICE_START :: 60 // each robot upgrade costs 3/2 of the last of its kind (rounded up)
 ROBOT_SPEED_MAX_LEVEL :: 12
@@ -44,6 +46,7 @@ Shop_Item :: enum {
 	Price,
 	Bush,
 	Port,
+	Solar,
 	Robot,
 	Robot_Speed,
 	Robot_Battery,
@@ -111,6 +114,8 @@ price :: proc(g: ^Game, item: Shop_Item) -> (int, bool) {
 			return 0, false
 		}
 		return doubling(PORT_PRICE_START, g.port_count), true
+	case .Solar:
+		return three_halves(SOLAR_PRICE_START, g.solar_level, SOLAR_MAX_LEVEL)
 	case .Robot:
 		if g.robot_count >= ROBOT_CAP {
 			return 0, false
@@ -202,6 +207,8 @@ buy :: proc(g: ^Game, item: Shop_Item) -> bool {
 			deny_row(g, item)
 			return false
 		}
+	case .Solar:
+		g.solar_level += 1
 	case .Robot_Speed:
 		g.robot_speed_level += 1
 	case .Robot_Battery:

@@ -17,7 +17,7 @@ Yer plot is small and fenced in. On it grows one berry bush, and in the corner s
 
 Spend yer jools at the shop, the $ in the corner: bigger hands to carry more, more energy for longer days, stamina so standing about tires you slower, a better price for every berry, and new bushes to pick from. Each one costs more than the last.
 
-Or let the robots do it. Buy a solar charging port, then a robot to live at it: it picks, carries and sells on its own, and goes home to charge before its battery runs out. The ports only soak up sun while it is day, and it is day for as long as you have energy left. The shop also sells robot speed, bigger robot batteries and bigger robot hands. And pay down the mortgage: a cool million jools at 10% a year, charged every night.
+Or let the robots do it. Buy a solar charging port, then a robot to live at it: it picks, carries and sells on its own, and goes home to charge before its battery runs out. The ports only soak up sun while it is day, and it is day for as long as you have energy left. The shop also sells a faster solar rate, robot speed, bigger robot batteries and bigger robot hands. And pay down the mortgage: a cool million jools at 10% a year, charged every night.
 
 Picking and selling wear you out, and so does standing about: the day only lasts as long as yer energy. When yer energy runs dry, go to bed in the other corner; morning brings full energy, full bushes and a little more interest. Pay the mortgage off and the plot is yers.
 

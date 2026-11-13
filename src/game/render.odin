@@ -443,6 +443,16 @@ draw_shop_menu :: proc(f: ^Frame, g: ^Game) {
 			print(f, " a berry)", x, y, COLOR_MID)
 		case .Port:
 			label_count(f, "Solar port", g.port_count, PORT_CAP, x0 + 10, y, label_color)
+		case .Solar:
+			// "Solar rate (0.50 a sec)"
+			x := x0 + 10 + print(f, "Solar rate", x0 + 10, y, label_color)
+			x += print(f, " (", x, y, COLOR_MID)
+			hundredths := int(port_sun_rate(g) * 100 + 0.5)
+			x += print(f, itoa(buf[:], hundredths / 100), x, y, COLOR_MID)
+			x += print(f, ".", x, y, COLOR_MID)
+			x += print(f, hundredths % 100 < 10 ? "0" : "", x, y, COLOR_MID)
+			x += print(f, itoa(buf[:], hundredths % 100), x, y, COLOR_MID)
+			print(f, " a sec)", x, y, COLOR_MID)
 		case .Robot:
 			label_count(f, "Robot", g.robot_count, ROBOT_CAP, x0 + 10, y, label_color)
 		case .Robot_Speed:

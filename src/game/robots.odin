@@ -9,7 +9,7 @@ package game
 //   charge. It picks the nearest bush with berries, takes a load to the basket, and heads home to
 //   its port to charge from the port's store before it runs flat. A robot waiting on an empty port
 //   (at night, say) waits.
-// - The shop sells ports, robots, and robot speed, battery and carrying upgrades (shop.odin).
+// - The shop sells ports, a faster solar rate, robots, and robot speed, battery and carrying upgrades (shop.odin).
 // Robots walk through the bush master and each other; bushes, the basket, the shop, the bed and the
 // ports are in their way.
 
@@ -17,7 +17,8 @@ package game
 PORT_CAP :: 4
 ROBOT_CAP :: PORT_CAP
 PORT_STORE :: 100.0 // charge a port can hold
-PORT_SUN_PER_SECOND :: 0.5 // charge a port gathers each second of day
+PORT_SUN_PER_SECOND :: 0.5 // charge a port gathers each second of day, before upgrades
+PORT_SUN_UPGRADE :: 0.25 // each Solar rate upgrade adds this (the user, November 13, 2026)
 PORT_FEED_PER_SECOND :: 6.0 // charge a port gives its robot each second
 ROBOT_BATTERY_START :: 60 // battery before upgrades
 ROBOT_BATTERY_UPGRADE :: 15
@@ -40,6 +41,10 @@ Robot :: struct {
 	carried:    int,
 	going_home: bool, // low on charge: heading to its port, then charging till full
 	step_timer: f64, // toward the next step
+}
+
+port_sun_rate :: proc(g: ^Game) -> f64 {
+	return PORT_SUN_PER_SECOND + f64(g.solar_level) * PORT_SUN_UPGRADE
 }
 
 robot_battery_max :: proc(g: ^Game) -> f64 {
@@ -257,7 +262,7 @@ tick_robots :: proc(g: ^Game, dt: f64) -> bool {
 	if !is_night(g) {
 		for i in 0 ..< g.port_count {
 			p := &g.ports[i]
-			p.charge = min(p.charge + PORT_SUN_PER_SECOND * dt, PORT_STORE)
+			p.charge = min(p.charge + port_sun_rate(g) * dt, PORT_STORE)
 		}
 	}
 	most := robot_battery_max(g)

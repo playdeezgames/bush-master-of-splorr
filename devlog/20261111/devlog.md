@@ -25,3 +25,5 @@ November 12: standing still tires you much more slowly now (a point every 10 sec
 And a way out: press Esc on the plot to start over. It tells you plainly that everything goes, mortgage back to a million, and waits for a yes.
 
 Later on November 12: robots! Buy a solar charging port and a robot to go with it, and the robot picks and sells for you, going home to charge before its battery gives out. The ports only gather sun by day, and day lasts as long as yer energy does. Robot speed, battery and hands are in the shop too, and the shop list scrolls now. The game has sound effects as well, and Esc on the plot opens a little menu to turn them off (or to start over).
+
+November 13: the shop sells a faster solar rate too, so every port soaks up sun quicker.

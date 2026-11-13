@@ -137,3 +137,33 @@ version_6_save_loads :: proc(t: ^testing.T) {
 	testing.expect_value(t, h.port_count, 0)
 	testing.expect_value(t, h.robot_count, 0)
 }
+
+@(test)
+solar_rate_upgrade_fills_ports_faster :: proc(t: ^testing.T) {
+	g: Game
+	init_game(&g)
+	testing_must(add_port(&g))
+	g.jools = 1000
+	testing.expect(t, buy(&g, .Solar), "bought")
+	testing.expect_value(t, g.jools, 1000 - SOLAR_PRICE_START)
+	testing.expect_value(t, port_sun_rate(&g), PORT_SUN_PER_SECOND + PORT_SUN_UPGRADE)
+	tick_for(&g, 4)
+	testing.expect(t, g.ports[0].charge > 4 * PORT_SUN_PER_SECOND + 0.5, "faster than before")
+	g.energy = 0
+	before := g.ports[0].charge
+	tick_for(&g, 4)
+	testing.expect_value(t, g.ports[0].charge, before) // still nothing at night
+}
+
+@(test)
+version_7_save_loads :: proc(t: ^testing.T) {
+	g, h: Game
+	init_game(&g)
+	g.version = 7
+	add_port(&g)
+	buf: [SAVE_CAP]u8
+	save_game(&g, buf[:])
+	testing.expect(t, load_game(&h, buf[:SAVE_V7_SIZE]), "v7 save loads")
+	testing.expect_value(t, h.port_count, 1)
+	testing.expect_value(t, h.solar_level, 0)
+}
