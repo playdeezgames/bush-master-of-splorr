@@ -167,3 +167,51 @@ version_7_save_loads :: proc(t: ^testing.T) {
 	testing.expect_value(t, h.port_count, 1)
 	testing.expect_value(t, h.solar_level, 0)
 }
+
+@(test)
+robots_sell_before_going_home :: proc(t: ^testing.T) {
+	g: Game
+	robot_game(&g)
+	g.robot_speed_level = ROBOT_SPEED_MAX_LEVEL
+	g.robot_carry_level = 8 // big loads, so a load is often half full when charge runs low
+	g.bushes[1] = {x = 6, y = 2, berries = BERRY_MAX}
+	g.bush_count = 2
+	held_at_home := 0
+	charges := 0
+	for _ in 0 ..< 6000 {
+		tick(&g, 0.1)
+		r := &g.robots[0]
+		if r.going_home && beside(r, g.ports[0].x, g.ports[0].y) {
+			charges += 1
+			if r.carried > 0 {
+				held_at_home += 1
+			}
+		}
+	}
+	testing.expect(t, charges > 0, "it charged")
+	testing.expect_value(t, held_at_home, 0)
+	testing.expect(t, g.jools > 0, "it sold")
+}
+
+@(test)
+robots_spread_over_the_bushes :: proc(t: ^testing.T) {
+	g: Game
+	robot_game(&g)
+	testing_must(add_port(&g))
+	testing_must(add_robot(&g))
+	g.bushes[1] = {x = 9, y = 5, berries = BERRY_MAX}
+	g.bush_count = 2
+	g.robot_carry_level = 6 // hands big enough that robot 0 stays at its bush a while
+	// Robot 0 (beside the first port) heads for the nearer first bush; robot 1 must leave it be.
+	claimed := claimed_before(&g, 1)
+	testing.expect(t, claimed[0], "robot 0 claims the first bush")
+	testing.expect(t, !claimed[1], "the second bush is free")
+	// Over a while, both bushes get picked.
+	picked_first, picked_second := false, false
+	for _ in 0 ..< 200 {
+		tick(&g, 0.1)
+		picked_first ||= g.bushes[0].berries < BERRY_MAX
+		picked_second ||= g.bushes[1].berries < BERRY_MAX
+	}
+	testing.expect(t, picked_first && picked_second, "both bushes worked")
+}

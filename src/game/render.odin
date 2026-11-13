@@ -103,9 +103,7 @@ draw_game :: proc(f: ^Frame, g: ^Game) {
 		r := g.robots[i]
 		sx, sy := tile_px(r.x, r.y)
 		draw_gfx(f, .Robot, sx, sy, COLOR_LIGHT)
-		for k in 0 ..< min(r.carried, 5) {
-			fill_rect(f, sx + 1 + k * 2, sy - 3, 2, 2, k % 2 == 0 ? COLOR_RED : COLOR_ORANGE)
-		}
+		draw_carried(f, sx, sy, min(r.carried, 5), r.y == 0, 2)
 		b := int(r.battery)
 		draw_bar(f, sx, sy + TILE, b, full, b * 4 > full ? COLOR_LIME : COLOR_RED)
 	}
@@ -113,9 +111,7 @@ draw_game :: proc(f: ^Frame, g: ^Game) {
 	{
 		sx, sy := tile_px(g.px, g.py)
 		draw_gfx(f, .Player, sx, sy, COLOR_WHITE)
-		for k in 0 ..< g.carried {
-			fill_rect(f, sx + 1 + k * 2, sy - 3, 2, 2, k % 2 == 0 ? COLOR_RED : COLOR_ORANGE)
-		}
+		draw_carried(f, sx, sy, g.carried, g.py == 0, 1)
 	}
 	// Floating tallies.
 	for p in g.pops {
@@ -124,19 +120,23 @@ draw_game :: proc(f: ^Frame, g: ^Game) {
 		}
 		sx, sy := tile_px(p.x, p.y)
 		rise := int(p.age / POP_SECONDS * 12)
+		// Above the tile, rising; on the top row, where the fence is, below it and sinking.
+		// FULL! and TIRED go a little further, clear of the berry dots.
+		clear := p.kind == .Full || p.kind == .Tired ? 5 : 0
+		y := p.y == 0 ? sy + TILE + 4 + clear + rise : sy - 8 - clear - rise
 		buf: [16]u8
 		switch p.kind {
 		case .Berry:
-			print(f, "+1", sx, sy - 8 - rise, COLOR_RED)
+			print(f, "+1", sx, y, COLOR_RED)
 		case .Jools:
-			w := print(f, "+", sx - 6, sy - 8 - rise, COLOR_YELLOW)
-			print(f, itoa(buf[:], p.amount), sx - 6 + w, sy - 8 - rise, COLOR_YELLOW)
+			w := print(f, "+", sx - 6, y, COLOR_YELLOW)
+			print(f, itoa(buf[:], p.amount), sx - 6 + w, y, COLOR_YELLOW)
 		case .Full:
-			print(f, "FULL!", sx - 9, sy - 8 - rise, COLOR_ORANGE)
+			print(f, "FULL!", sx - 9, y, COLOR_ORANGE)
 		case .New_Bush:
-			print(f, "NEW!", sx - 6, sy - 8 - rise, COLOR_LIME)
+			print(f, "NEW!", sx - 6, y, COLOR_LIME)
 		case .Tired:
-			print(f, "TIRED", sx - 9, sy - 8 - rise, COLOR_RED)
+			print(f, "TIRED", sx - 9, y, COLOR_RED)
 		}
 	}
 	// Title, day and tallies: jools and what is held, then energy and what is owed.
@@ -195,11 +195,12 @@ draw_game :: proc(f: ^Frame, g: ^Game) {
 	// How to play, or a warning when too tired to work.
 	hy := (PLOT_TY + PLOT_H + 1) * TILE + 6
 	if g.energy < min(PICK_ENERGY, DEPOSIT_ENERGY) {
-		print_centered(f, "Too tired to pick or sell. Go to bed!", hy, COLOR_RED)
+		print_centered(f, "Too tired to pick or sell.", hy, COLOR_RED)
+		print_centered(f, "Walk into the bed (bottom left) to sleep.", hy + 10, COLOR_RED)
 	} else {
 		print_centered(f, "Walk into a bush to pick, the basket to sell,", hy, COLOR_LIGHT)
+		print_centered(f, "the $ to shop and the bed to sleep.", hy + 10, COLOR_LIGHT)
 	}
-	print_centered(f, "the $ to shop and the bed to sleep.", hy + 10, COLOR_LIGHT)
 	print_centered(f, "Arrows or WASD to walk, Space for OK, Esc for menu.", hy + 20, COLOR_MID)
 	if g.menu_open {
 		draw_shop_menu(f, g)
@@ -346,6 +347,15 @@ draw_confirm_reset :: proc(f: ^Frame, g: ^Game) {
 	print(f, t, x0 + (w - text_width(t)) / 2, y0 + h - 12, COLOR_MID)
 }
 
+// Berries carried, as red and orange dots over the head; on the top row, where the fence is over the
+// head, under the feet instead (below the battery bar for a robot: `below` pixels lower).
+draw_carried :: proc(f: ^Frame, sx, sy, n: int, top_row: bool, below: int) {
+	y := top_row ? sy + TILE + below : sy - 3
+	for k in 0 ..< n {
+		fill_rect(f, sx + 1 + k * 2, y, 2, 2, k % 2 == 0 ? COLOR_RED : COLOR_ORANGE)
+	}
+}
+
 // "Solar port (have 1 of 4)"
 label_count :: proc(f: ^Frame, label: string, have, most, x, y: int, color: u8) {
 	buf: [16]u8
@@ -386,7 +396,7 @@ draw_shop_menu :: proc(f: ^Frame, g: ^Game) {
 	x0 := MENU_X + 10
 	print(f, "$ THE SHOP", x0, MENU_Y + 6, COLOR_YELLOW)
 	{
-		n := itoa(buf[:], g.jools)
+		n := commas(buf[:], i64(g.jools))
 		w := text_width("Jools ") + text_width(n)
 		x := MENU_X + MENU_W - 10 - w
 		x += print(f, "Jools ", x, MENU_Y + 6, COLOR_LIGHT)

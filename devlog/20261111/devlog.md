@@ -27,3 +27,5 @@ And a way out: press Esc on the plot to start over. It tells you plainly that ev
 Later on November 12: robots! Buy a solar charging port and a robot to go with it, and the robot picks and sells for you, going home to charge before its battery gives out. The ports only gather sun by day, and day lasts as long as yer energy does. Robot speed, battery and hands are in the shop too, and the shop list scrolls now. The game has sound effects as well, and Esc on the plot opens a little menu to turn them off (or to start over).
 
 November 13: the shop sells a faster solar rate too, so every port soaks up sun quicker.
+
+After a playtest the same day: robots sell their load before going home to charge instead of sitting on it, and they spread out over the bushes instead of queueing at one. Also tidied: commas in the shop's jool count, berries and pop-ups no longer drawn over the top fence, and a clearer "too tired" message.

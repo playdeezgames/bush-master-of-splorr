@@ -183,15 +183,101 @@ beside :: proc(r: ^Robot, x, y: int) -> bool {
 	return abs(r.x - x) + abs(r.y - y) == 1
 }
 
+// Steps to standing beside an allowed bush with berries, and which bush (its index) each tile is
+// nearest to; -1 where none can be reached.
+berry_map :: proc(g: ^Game, allowed: ^[BUSH_CAP]bool, d, owner: ^Dist_Map) {
+	queue: [PLOT_W * PLOT_H]int
+	head, tail := 0, 0
+	for i in 0 ..< len(d) {
+		d[i] = -1
+		owner[i] = -1
+	}
+	for y in 0 ..< PLOT_H {
+		for x in 0 ..< PLOT_W {
+			if !robot_walkable(g, x, y) {
+				continue
+			}
+			for dir in DIRS {
+				for k in 0 ..< g.bush_count {
+					bu := g.bushes[k]
+					if allowed[k] && bu.berries > 0 && bu.x == x + dir.x && bu.y == y + dir.y {
+						d[y * PLOT_W + x] = 0
+						owner[y * PLOT_W + x] = k
+						break
+					}
+				}
+				if d[y * PLOT_W + x] == 0 {
+					queue[tail] = y * PLOT_W + x
+					tail += 1
+					break
+				}
+			}
+		}
+	}
+	for head < tail {
+		at := queue[head]
+		head += 1
+		x, y := at % PLOT_W, at / PLOT_W
+		for dir in DIRS {
+			nx, ny := x + dir.x, y + dir.y
+			if !in_plot(nx, ny) || !robot_walkable(g, nx, ny) || d[ny * PLOT_W + nx] >= 0 {
+				continue
+			}
+			d[ny * PLOT_W + nx] = d[at] + 1
+			owner[ny * PLOT_W + nx] = owner[at]
+			queue[tail] = ny * PLOT_W + nx
+			tail += 1
+		}
+	}
+}
+
+// Whether robot j is out picking (not heading home, hands not full).
+robot_picking :: proc(g: ^Game, j: int) -> bool {
+	r := g.robots[j]
+	return !r.going_home && r.carried < robot_carry_max(g)
+}
+
+// The bushes robot i should leave alone: each robot before it, in turn, claims the nearest bush with
+// berries that no robot before it has claimed, so robots spread over the bushes instead of
+// crowding one.
+claimed_before :: proc(g: ^Game, i: int) -> [BUSH_CAP]bool {
+	claimed: [BUSH_CAP]bool
+	for j in 0 ..< i {
+		if !robot_picking(g, j) {
+			continue
+		}
+		allowed: [BUSH_CAP]bool
+		for k in 0 ..< BUSH_CAP {
+			allowed[k] = !claimed[k]
+		}
+		d, owner: Dist_Map
+		berry_map(g, &allowed, &d, &owner)
+		r := g.robots[j]
+		if k := owner[r.y * PLOT_W + r.x]; k >= 0 {
+			claimed[k] = true
+		}
+	}
+	return claimed
+}
+
 // What a robot does with one step's worth of time.
 robot_act :: proc(g: ^Game, i: int) {
 	r := &g.robots[i]
 	if r.battery < ROBOT_STEP_COST {
 		return // flat: it waits (it should have gone home first)
 	}
-	home: Dist_Map
+	home, basket: Dist_Map
 	dist_map(g, .Home, i, &home)
+	dist_map(g, .Basket, i, &basket)
 	hd := dist_at(&home, r.x, r.y)
+	kd := dist_at(&basket, r.x, r.y)
+	// The longest way home from beside the basket.
+	from_basket := 0
+	for t in 0 ..< len(basket) {
+		if basket[t] == 0 {
+			from_basket = max(from_basket, home[t])
+		}
+	}
 	// Enough left to get home, with a little to spare, or it goes now.
 	if !r.going_home && hd >= 0 && r.battery < f64(hd + 2) * ROBOT_STEP_COST {
 		r.going_home = true
@@ -202,25 +288,44 @@ robot_act :: proc(g: ^Game, i: int) {
 		}
 		return // beside the port, tick_robots charges it
 	}
-	berries: Dist_Map
-	dist_map(g, .Berries, i, &berries)
+	// Berries: a bush no robot before this one has claimed, or any if those are all bare.
+	allowed := claimed_before(g, i)
+	for k in 0 ..< BUSH_CAP {
+		allowed[k] = !allowed[k]
+	}
+	berries, owner: Dist_Map
+	berry_map(g, &allowed, &berries, &owner)
+	if dist_at(&berries, r.x, r.y) < 0 {
+		for k in 0 ..< BUSH_CAP {
+			allowed[k] = true
+		}
+		berry_map(g, &allowed, &berries, &owner)
+	}
 	bd := dist_at(&berries, r.x, r.y)
-	if r.carried >= robot_carry_max(g) || (r.carried > 0 && bd < 0) {
-		basket: Dist_Map
-		dist_map(g, .Basket, i, &basket)
-		if dist_at(&basket, r.x, r.y) == 0 {
+	// Selling and then getting home takes this much; a load is sold while there is still enough.
+	sell_and_home := f64(max(kd, 0) + 1 + from_basket + 4) * ROBOT_STEP_COST
+	if r.carried > 0 && (r.carried >= robot_carry_max(g) || bd < 0 || r.battery < sell_and_home) {
+		if kd == 0 {
 			robot_deposit(g, r)
 		} else {
 			step_toward(g, r, &basket)
 		}
 		return
 	}
+	// Empty hands and not enough for a whole trip (to a bush, pick, to the basket, sell, home):
+	// charge first rather than come home with berries.
+	if r.carried == 0 && bd >= 0 && hd > 0 {
+		trip := f64(bd + 1 + bd + max(kd, 0) + 1 + from_basket + 2) * ROBOT_STEP_COST
+		if r.battery < trip && r.battery < robot_battery_max(g) {
+			r.going_home = true
+			step_toward(g, r, &home)
+			return
+		}
+	}
 	if bd == 0 {
-		for dir in DIRS {
-			if b := bush_at(g, r.x + dir.x, r.y + dir.y); b != nil && b.berries > 0 {
-				robot_pick(g, r, b)
-				return
-			}
+		if k := owner[r.y * PLOT_W + r.x]; k >= 0 {
+			robot_pick(g, r, &g.bushes[k])
+			return
 		}
 	}
 	if bd > 0 {
