@@ -1,6 +1,6 @@
 # itch.io page copy: Bush Master of SPLORR!!
 
-Page: https://thegrumpygamedev.itch.io/bush-master-of-splorr (first itch release booked for November 24, 2026, Coxswain ship 31). GitHub Pages comes first.
+Page: https://thegrumpygamedev.itch.io/bush-master-of-splorr (created as a Draft November 23, 2026, edit id 5427933; first itch release booked for November 24, 2026, Coxswain ship 31). GitHub Pages comes first.
 **Draft, written November 11, 2026 with the first build; the user has not approved any of it.** Pasted in by hand; nothing here is published by the repo. Cover: `assets/cover.png` (630 by 500, a placeholder made by `tools/make_cover.py`). Screenshots: `assets/screenshots/` (rendered by `tools/make_shots.sh`).
 
 ## Short description (the one-line field)
