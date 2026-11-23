@@ -1,6 +1,6 @@
 # itch.io page copy: Bush Master of SPLORR!!
 
-Page: https://thegrumpygamedev.itch.io/bush-master-of-splorr (not created yet; no release booked). GitHub Pages comes first.
+Page: https://thegrumpygamedev.itch.io/bush-master-of-splorr (first itch release booked for November 24, 2026, Coxswain ship 31). GitHub Pages comes first.
 **Draft, written November 11, 2026 with the first build; the user has not approved any of it.** Pasted in by hand; nothing here is published by the repo. Cover: `assets/cover.png` (630 by 500, a placeholder made by `tools/make_cover.py`). Screenshots: `assets/screenshots/` (rendered by `tools/make_shots.sh`).
 
 ## Short description (the one-line field)
@@ -33,7 +33,7 @@ Yer plot is saved in the browser as you play. To begin a fresh one, press Esc on
 
 Made for the browser in Odin compiled to WebAssembly.
 
-**AI disclosure:** made with Claude Code. The design and every decision are TheGrumpyGameDev's; Claude writes the code and the tests and drafts the text at the author's direction.
+**AI disclosure:** made with Claude Code. The design and every decision are TheGrumpyGameDev's; Claude writes the code (including the synthesised sound effects) and the tests and drafts the text at the author's direction.
 
 ### Credits
 
@@ -46,7 +46,8 @@ Made for the browser in Odin compiled to WebAssembly.
 ## Page settings (by hand, when the time comes)
 
 - Kind of project: HTML. Tick "played in the browser". Uploads: only the `html` channel.
-- Embed size: landscape (the canvas is 384 by 216 scaled up). Mobile friendly: yes, landscape orientation.
+- Embed: "Click to launch in fullscreen" (embed_type maximized; the user's rule for every game, November 13, 2026). Mobile friendly: yes, landscape orientation.
+- External link: "Latest version (GitHub Pages)" to https://playdeezgames.github.io/bush-master-of-splorr/ (type Other).
 - Classification: Games. Genre: Simulation.
 - Tags: 1-bit, farming, casual, idle, metaphor, funny.
-- AI disclosure field: Yes (Code, Text).
+- AI disclosure field: Yes (Code, Text, Sound: the sound effects are Web Audio blips synthesised by code Claude wrote).
