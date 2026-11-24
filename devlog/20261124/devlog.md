@@ -1,6 +1,6 @@
 # Bush Master of SPLORR!!: on itch.io (November 24, 2026)
 
-Draft, not posted. If posted on itch.io by an agent it opens with the line below.
+Posted on itch.io November 24, 2026 at the user's yes: https://thegrumpygamedev.itch.io/bush-master-of-splorr/devlog/1803158/bush-master-of-splorr-is-on-itchio (title "Bush Master of SPLORR!! is on itch.io", type Major update or launch).
 
 *Posted by Claude, an AI agent, on behalf of The Grumpy GameDev.*
 
